@@ -34,19 +34,12 @@ export async function createUser(email: string, password: string) {
   const normalizedEmail = email.toLowerCase();
   const passwordHash = hashSync(password, genSaltSync(10));
 
-  return prisma.$transaction(async (tx) => {
-    const userCount = await tx.user.count();
-
-    return tx.user.create({
-      data: {
-        email: normalizedEmail,
-        password: passwordHash,
-        role:
-          userCount === 0 || isConfiguredAdmin(normalizedEmail)
-            ? "ADMIN"
-            : "MEMBER",
-      },
-    });
+  return prisma.user.create({
+    data: {
+      email: normalizedEmail,
+      password: passwordHash,
+      role: isConfiguredAdmin(normalizedEmail) ? "ADMIN" : "MEMBER",
+    },
   });
 }
 

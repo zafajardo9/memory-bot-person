@@ -9,6 +9,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("POSTGRES_URL"),
+    // Prefer a direct database connection for schema changes. The application
+    // can continue using an Accelerate URL through POSTGRES_URL at runtime.
+    url: process.env.DIRECT_DATABASE_URL || env("POSTGRES_URL"),
   },
 });

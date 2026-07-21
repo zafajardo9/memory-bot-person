@@ -24,7 +24,7 @@ The original weather and demonstration flight-booking tools remain available for
 
 - Streaming multi-provider chat with per-user provider and model selection
 - Email/password authentication with Auth.js and bcrypt
-- Admin/member roles; the first registered user becomes an administrator
+- Admin/member roles controlled by an explicit administrator allowlist
 - User-scoped persistent chat history
 - Prisma ORM 7 with direct PostgreSQL and Prisma Accelerate URL support
 - Admin-configurable Google Gemini and OpenAI connections encrypted in PostgreSQL, with environment fallbacks
@@ -74,6 +74,8 @@ ADMIN_EMAILS="admin@company.com"
 GOOGLE_GENERATIVE_AI_API_KEY="your-google-ai-api-key"
 OPENAI_API_KEY="your-openai-api-key"
 POSTGRES_URL="prisma+postgres://..."
+# Recommended when POSTGRES_URL is an Accelerate URL:
+DIRECT_DATABASE_URL="postgresql://..."
 BLOB_READ_WRITE_TOKEN="your-vercel-blob-token"
 
 KNOWLEDGE_MANAGEMENT_ENABLED=true
@@ -84,9 +86,9 @@ KNOWLEDGE_MAX_SOURCES=250
 KNOWLEDGE_MAX_CONTEXT_TOKENS=1000000
 ```
 
-`POSTGRES_URL` may be a direct `postgres://`/`postgresql://` URL or a Prisma Accelerate `prisma+postgres://` URL. Direct URLs use the Prisma `pg` adapter; Accelerate URLs use the Prisma Accelerate client extension.
+`POSTGRES_URL` may be a direct `postgres://`/`postgresql://` URL or a Prisma Accelerate `prisma+postgres://` URL. Direct URLs use the Prisma `pg` adapter; Accelerate URLs use the Prisma Accelerate client extension. When Accelerate is used, set `DIRECT_DATABASE_URL` to the database's direct connection string for migration commands.
 
-`ADMIN_EMAILS` is a comma-separated bootstrap allowlist. The first registered user also becomes an administrator. Existing allowlisted accounts are promoted the next time they sign in.
+`ADMIN_EMAILS` is a comma-separated bootstrap allowlist and must be configured before a new deployment is made public. Only allowlisted accounts become administrators. Existing allowlisted accounts are promoted the next time they sign in.
 
 Administrators may configure, test, activate, and rotate Google Gemini and OpenAI connections at `/settings/ai`. The application discovers the chat-capable models available to each credential and lets the administrator choose a default. Site-managed keys are encrypted with AES-256-GCM using `AUTH_SECRET` and take priority over `GOOGLE_GENERATIVE_AI_API_KEY` or `OPENAI_API_KEY`. Environment variables remain useful for initial setup.
 
@@ -111,6 +113,27 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000), register the first account, and visit [http://localhost:3000/knowledge](http://localhost:3000/knowledge).
 
+## Deploy to Vercel
+
+1. Add the environment variables listed above to the Vercel project. Set them
+   separately for Production and Preview as appropriate. Do not expose a new
+   deployment until `AUTH_SECRET`, `ADMIN_EMAILS`, and `POSTGRES_URL` are set.
+2. Apply pending schema changes from a trusted machine or CI job with database
+   network access:
+
+   ```bash
+   pnpm install --frozen-lockfile
+   pnpm db:deploy
+   ```
+
+3. Deploy with Vercel's default `pnpm build` command. The application build does
+   not run migrations or require a live database connection.
+
+Use `DIRECT_DATABASE_URL` for migration commands when the runtime
+`POSTGRES_URL` points to Prisma Accelerate. Apply migrations once before routing
+production traffic to a release. Do not run migrations concurrently from every
+Vercel build or Preview deployment.
+
 ### Component inspector
 
 Development builds include the Xray component inspector. Press `Cmd+Shift+X`
@@ -132,7 +155,7 @@ To publish knowledge:
 | Command | Purpose |
 | --- | --- |
 | `pnpm dev` | Start the Turbopack development server. |
-| `pnpm build` | Generate Prisma Client, deploy migrations, and build Next.js. |
+| `pnpm build` | Generate Prisma Client and build Next.js without connecting to the database. |
 | `pnpm start` | Serve a production build. |
 | `pnpm lint` | Run ESLint 9 with the flat project configuration. |
 | `pnpm typecheck` | Run TypeScript without emitting files. |
