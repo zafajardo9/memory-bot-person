@@ -27,7 +27,7 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Toaster position="top-center" />
+          <Toaster position="top-center" richColors closeButton />
           <Navbar />
           {children}
           {process.env.NODE_ENV === "development" ? (

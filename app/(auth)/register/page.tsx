@@ -56,7 +56,7 @@ export default function Page() {
             <p className="mt-2 text-sm text-muted-foreground">Use your work email and a secure password.</p>
           </div>
           <AuthForm action={handleSubmit} defaultEmail={email}>
-            <SubmitButton>Create account</SubmitButton>
+            <SubmitButton pendingLabel="Creating account…">Create account</SubmitButton>
             <p className="mt-4 text-center text-sm text-muted-foreground">
             {"Already have an account? "}
             <Link

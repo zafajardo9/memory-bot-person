@@ -43,6 +43,7 @@ export function AuthForm({
           name="password"
           className="h-11 text-base md:text-sm"
           type="password"
+          autoComplete="current-password"
           required
         />
       </div>
