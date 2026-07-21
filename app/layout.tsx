@@ -1,3 +1,4 @@
+import { Xray } from "@stinsky/xray";
 import { Metadata } from "next";
 import { Toaster } from "sonner";
 
@@ -8,8 +9,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://gemini.vercel.ai"),
-  title: "Next.js Gemini Chatbot",
-  description: "Next.js chatbot template using the AI SDK and Gemini.",
+  title: "Memory — Company knowledge assistant",
+  description: "Capture, organize, and ask questions across your company knowledge.",
 };
 
 export default async function RootLayout({
@@ -18,7 +19,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
@@ -29,6 +30,9 @@ export default async function RootLayout({
           <Toaster position="top-center" />
           <Navbar />
           {children}
+          {process.env.NODE_ENV === "development" ? (
+            <Xray color="#639ee8" />
+          ) : null}
         </ThemeProvider>
       </body>
     </html>

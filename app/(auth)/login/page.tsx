@@ -38,28 +38,36 @@ export default function Page() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl flex flex-col gap-12">
-        <div className="flex flex-col items-center justify-center gap-2 px-4 text-center sm:px-16">
-          <h3 className="text-xl font-semibold dark:text-zinc-50">Sign In</h3>
-          <p className="text-sm text-gray-500 dark:text-zinc-400">
-            Use your email and password to sign in
-          </p>
+    <main className="page-shell flex items-center justify-center">
+      <section className="grid w-full max-w-4xl overflow-hidden border bg-card md:grid-cols-[1.1fr_0.9fr]">
+        <div className="hidden border-r bg-muted/40 p-10 md:flex md:flex-col md:justify-between">
+          <p className="eyebrow">Memory / Workspace access</p>
+          <div>
+            <h1 className="max-w-sm text-4xl font-semibold tracking-[-0.045em]">One place for what your company knows.</h1>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">Return to grounded answers, shared notes, and the sources behind every decision.</p>
+          </div>
         </div>
-        <AuthForm action={handleSubmit} defaultEmail={email}>
-          <SubmitButton>Sign in</SubmitButton>
-          <p className="text-center text-sm text-gray-600 mt-4 dark:text-zinc-400">
+        <div className="p-6 sm:p-10">
+          <div className="mb-8">
+            <p className="eyebrow">Welcome back</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight">Sign in to Memory</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Enter your work email and password.</p>
+          </div>
+          <AuthForm action={handleSubmit} defaultEmail={email}>
+            <SubmitButton>Sign in</SubmitButton>
+            <p className="mt-4 text-center text-sm text-muted-foreground">
             {"Don't have an account? "}
             <Link
               href="/register"
-              className="font-semibold text-gray-800 hover:underline dark:text-zinc-200"
+              className="font-medium text-primary hover:underline"
             >
-              Sign up
+              Create one
             </Link>
-            {" for free."}
-          </p>
-        </AuthForm>
-      </div>
-    </div>
+            {"."}
+            </p>
+          </AuthForm>
+        </div>
+      </section>
+    </main>
   );
 }

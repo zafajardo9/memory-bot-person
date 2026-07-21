@@ -54,7 +54,7 @@ export function Row({ row = SAMPLE.arrival, type = "arrival" }) {
       </div>
 
       <div className="flex flex-col gap-1 items-end justify-center mt-auto">
-        <div className="text-sm sm:text-sm bg-amber-400 rounded-md w-fit px-2 text-amber-900">
+        <div className="w-fit rounded-md border bg-muted px-2 font-mono text-xs">
           {row.gate}
         </div>
         <div className="text-sm text-muted-foreground">
@@ -67,7 +67,7 @@ export function Row({ row = SAMPLE.arrival, type = "arrival" }) {
 
 export function FlightStatus({ flightStatus = SAMPLE }) {
   return (
-    <div className="flex flex-col gap-2 bg-muted rounded-lg p-4">
+    <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
       <div className="flex flex-col gap-1 text-sm">
         <div className="text-muted-foreground">{flightStatus.flightNumber}</div>
         <div className="text-lg font-medium">

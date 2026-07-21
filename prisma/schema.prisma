@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  MEMBER
+  ADMIN
+}
+
+enum KnowledgeSourceType {
+  NOTE
+  FILE
+  URL
+}
+
+enum KnowledgeSourceStatus {
+  DRAFT
+  PROCESSING
+  APPROVED
+  FAILED
+  ARCHIVED
+}
+
+enum KnowledgeVersionStatus {
+  QUEUED
+  PROCESSING
+  READY
+  APPROVED
+  FAILED
+  ARCHIVED
+}
+
+enum KnowledgeJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id               String                   @id @default(uuid()) @db.Uuid
+  email            String                   @unique @db.VarChar(255)
+  password         String?                  @db.VarChar(255)
+  role             UserRole                 @default(MEMBER)
+  chats            Chat[]
+  reservations     Reservation[]
+  knowledgeSources KnowledgeSource[]        @relation("KnowledgeSourceCreator")
+  approvedVersions KnowledgeSourceVersion[] @relation("KnowledgeVersionApprover")
+  knowledgeAudits  KnowledgeAuditEvent[]
+  knowledgeQueries KnowledgeQueryLog[]
+  providerConfigs  AiProviderConfig[]       @relation("AIProviderConfigUpdater")
+  aiSelection      UserAiSelection?
+
+  @@map("User")
+}
+
+model AiProviderConfig {
+  providerId     String   @id @db.VarChar(50)
+  encryptedValue String?  @db.Text
+  enabled        Boolean  @default(false)
+  defaultModelId String?  @db.VarChar(200)
+  updatedById    String   @db.Uuid
+  updatedAt      DateTime @updatedAt
+  updatedBy      User     @relation("AIProviderConfigUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([updatedById])
+  @@map("AIProviderConfig")
+}
+
+model UserAiSelection {
+  userId     String   @id @db.Uuid
+  providerId String   @db.VarChar(50)
+  modelId    String   @db.VarChar(200)
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@map("UserAISelection")
+}
+
+model Chat {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  messages  Json
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("Chat")
+}
+
+model Reservation {
+  id                  String   @id @default(uuid()) @db.Uuid
+  createdAt           DateTime @default(now())
+  details             Json
+  hasCompletedPayment Boolean  @default(false)
+  userId              String   @db.Uuid
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("Reservation")
+}
+
+model KnowledgeSource {
+  id               String                   @id @default(uuid()) @db.Uuid
+  type             KnowledgeSourceType
+  status           KnowledgeSourceStatus    @default(DRAFT)
+  title            String                   @db.VarChar(200)
+  canonicalUrl     String?                  @db.Text
+  mimeType         String?                  @db.VarChar(150)
+  tags             String[]                 @default([])
+  crawlDepth       Int                      @default(0)
+  crawlLimit       Int                      @default(1)
+  createdById      String                   @db.Uuid
+  currentVersionId String?                  @unique @db.Uuid
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  lastIndexedAt    DateTime?
+  archivedAt       DateTime?
+  createdBy        User                     @relation("KnowledgeSourceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  versions         KnowledgeSourceVersion[] @relation("KnowledgeSourceVersions")
+  currentVersion   KnowledgeSourceVersion?  @relation("CurrentKnowledgeVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  jobs             KnowledgeIngestionJob[]
+  audits           KnowledgeAuditEvent[]
+
+  @@index([status, updatedAt])
+  @@index([createdById])
+}
+
+model KnowledgeSourceVersion {
+  id               String                  @id @default(uuid()) @db.Uuid
+  sourceId         String                  @db.Uuid
+  version          Int
+  checksum         String                  @db.VarChar(64)
+  status           KnowledgeVersionStatus  @default(QUEUED)
+  originalContent  Bytes?
+  extractedText    String?                 @db.Text
+  metadata         Json?
+  errorMessage     String?                 @db.Text
+  embeddingModel   String?                 @db.VarChar(100)
+  approvedById     String?                 @db.Uuid
+  approvedAt       DateTime?
+  createdAt        DateTime                @default(now())
+  source           KnowledgeSource         @relation("KnowledgeSourceVersions", fields: [sourceId], references: [id], onDelete: Cascade)
+  currentForSource KnowledgeSource?        @relation("CurrentKnowledgeVersion")
+  approvedBy       User?                   @relation("KnowledgeVersionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  chunks           KnowledgeChunk[]
+  jobs             KnowledgeIngestionJob[]
+
+  @@unique([sourceId, version])
+  @@unique([sourceId, checksum])
+  @@index([sourceId, status])
+}
+
+model KnowledgeChunk {
+  id           String                      @id @default(uuid()) @db.Uuid
+  versionId    String                      @db.Uuid
+  ordinal      Int
+  content      String                      @db.Text
+  section      String?                     @db.VarChar(500)
+  pageNumber   Int?
+  sourceUrl    String?                     @db.Text
+  tokenCount   Int
+  embedding    Unsupported("vector(768)")?
+  searchVector Unsupported("tsvector")?
+  version      KnowledgeSourceVersion      @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, ordinal])
+  @@index([versionId])
+}
+
+model KnowledgeIngestionJob {
+  id             String                 @id @default(uuid()) @db.Uuid
+  sourceId       String                 @db.Uuid
+  versionId      String                 @db.Uuid
+  status         KnowledgeJobStatus     @default(QUEUED)
+  stage          String                 @default("queued") @db.VarChar(50)
+  progress       Int                    @default(0)
+  attempts       Int                    @default(0)
+  idempotencyKey String                 @unique @db.VarChar(160)
+  errorMessage   String?                @db.Text
+  createdAt      DateTime               @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  source         KnowledgeSource        @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  version        KnowledgeSourceVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([sourceId])
+}
+
+model KnowledgeAuditEvent {
+  id        String           @id @default(uuid()) @db.Uuid
+  actorId   String           @db.Uuid
+  sourceId  String?          @db.Uuid
+  action    String           @db.VarChar(80)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  actor     User             @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  source    KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([sourceId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model KnowledgeQueryLog {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid
+  chatId            String?  @db.Uuid
+  query             String   @db.VarChar(1000)
+  retrievedChunkIds String[] @default([])
+  resultCount       Int
+  latencyMs         Int
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}

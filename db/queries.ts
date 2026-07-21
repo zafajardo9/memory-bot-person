@@ -1,37 +1,53 @@
 import "server-only";
 
 import { genSaltSync, hashSync } from "bcrypt-ts";
-import { desc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 
-import { user, chat, User, reservation } from "./schema";
+import { prisma } from "@/lib/prisma";
 
-// Optionally, if not using email/pass login, you can
-// use the Drizzle adapter for Auth.js / NextAuth
-// https://authjs.dev/reference/adapter/drizzle
-let client = postgres(`${process.env.POSTGRES_URL!}?sslmode=require`);
-let db = drizzle(client);
+import type { ChatSummary, User } from "./types";
+import type { Prisma } from "@/lib/generated/prisma/client";
+
+function isConfiguredAdmin(email: string) {
+  return (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email.toLowerCase());
+}
 
 export async function getUser(email: string): Promise<Array<User>> {
-  try {
-    return await db.select().from(user).where(eq(user.email, email));
-  } catch (error) {
-    console.error("Failed to get user from database");
-    throw error;
+  const users = await prisma.user.findMany({
+    where: { email: email.toLowerCase() },
+  });
+
+  if (users[0] && users[0].role !== "ADMIN" && isConfiguredAdmin(users[0].email)) {
+    users[0] = await prisma.user.update({
+      where: { id: users[0].id },
+      data: { role: "ADMIN" },
+    });
   }
+
+  return users;
 }
 
 export async function createUser(email: string, password: string) {
-  let salt = genSaltSync(10);
-  let hash = hashSync(password, salt);
+  const normalizedEmail = email.toLowerCase();
+  const passwordHash = hashSync(password, genSaltSync(10));
 
-  try {
-    return await db.insert(user).values({ email, password: hash });
-  } catch (error) {
-    console.error("Failed to create user in database");
-    throw error;
-  }
+  return prisma.$transaction(async (tx) => {
+    const userCount = await tx.user.count();
+
+    return tx.user.create({
+      data: {
+        email: normalizedEmail,
+        password: passwordHash,
+        role:
+          userCount === 0 || isConfiguredAdmin(normalizedEmail)
+            ? "ADMIN"
+            : "MEMBER",
+      },
+    });
+  });
 }
 
 export async function saveChat({
@@ -40,63 +56,58 @@ export async function saveChat({
   userId,
 }: {
   id: string;
-  messages: any;
+  messages: unknown;
   userId: string;
 }) {
-  try {
-    const selectedChats = await db.select().from(chat).where(eq(chat.id, id));
+  const existing = await prisma.chat.findUnique({
+    where: { id },
+    select: { userId: true },
+  });
 
-    if (selectedChats.length > 0) {
-      return await db
-        .update(chat)
-        .set({
-          messages: JSON.stringify(messages),
-        })
-        .where(eq(chat.id, id));
-    }
-
-    return await db.insert(chat).values({
-      id,
-      createdAt: new Date(),
-      messages: JSON.stringify(messages),
-      userId,
-    });
-  } catch (error) {
-    console.error("Failed to save chat in database");
-    throw error;
+  if (existing && existing.userId !== userId) {
+    throw new Error("Cannot update another user's chat");
   }
+
+  return prisma.chat.upsert({
+    where: { id },
+    create: {
+      id,
+      messages: messages as unknown as Prisma.InputJsonValue,
+      userId,
+    },
+    update: {
+      messages: messages as unknown as Prisma.InputJsonValue,
+    },
+  });
 }
 
 export async function deleteChatById({ id }: { id: string }) {
-  try {
-    return await db.delete(chat).where(eq(chat.id, id));
-  } catch (error) {
-    console.error("Failed to delete chat by id from database");
-    throw error;
-  }
+  return prisma.chat.delete({ where: { id } });
 }
 
 export async function getChatsByUserId({ id }: { id: string }) {
-  try {
-    return await db
-      .select()
-      .from(chat)
-      .where(eq(chat.userId, id))
-      .orderBy(desc(chat.createdAt));
-  } catch (error) {
-    console.error("Failed to get chats by user from database");
-    throw error;
-  }
+  return prisma.$queryRaw<Array<ChatSummary>>`
+    SELECT
+      "id",
+      "createdAt",
+      LEFT(
+        COALESCE(
+          NULLIF("messages"->0->'parts'->0->>'text', ''),
+          NULLIF("messages"->0->>'content', ''),
+          NULLIF("messages"->0->'content'->0->>'text', ''),
+          'Untitled conversation'
+        ),
+        120
+      ) AS "title"
+    FROM "Chat"
+    WHERE "userId" = ${id}::uuid
+    ORDER BY "createdAt" DESC
+    LIMIT 100
+  `;
 }
 
 export async function getChatById({ id }: { id: string }) {
-  try {
-    const [selectedChat] = await db.select().from(chat).where(eq(chat.id, id));
-    return selectedChat;
-  } catch (error) {
-    console.error("Failed to get chat by id from database");
-    throw error;
-  }
+  return prisma.chat.findUnique({ where: { id } });
 }
 
 export async function createReservation({
@@ -106,24 +117,15 @@ export async function createReservation({
 }: {
   id: string;
   userId: string;
-  details: any;
+  details: Prisma.InputJsonValue;
 }) {
-  return await db.insert(reservation).values({
-    id,
-    createdAt: new Date(),
-    userId,
-    hasCompletedPayment: false,
-    details: JSON.stringify(details),
+  return prisma.reservation.create({
+    data: { id, userId, details },
   });
 }
 
 export async function getReservationById({ id }: { id: string }) {
-  const [selectedReservation] = await db
-    .select()
-    .from(reservation)
-    .where(eq(reservation.id, id));
-
-  return selectedReservation;
+  return prisma.reservation.findUnique({ where: { id } });
 }
 
 export async function updateReservation({
@@ -133,10 +135,8 @@ export async function updateReservation({
   id: string;
   hasCompletedPayment: boolean;
 }) {
-  return await db
-    .update(reservation)
-    .set({
-      hasCompletedPayment,
-    })
-    .where(eq(reservation.id, id));
+  return prisma.reservation.update({
+    where: { id },
+    data: { hasCompletedPayment },
+  });
 }

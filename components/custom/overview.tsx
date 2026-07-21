@@ -1,49 +1,24 @@
 import { motion } from "framer-motion";
-import Link from "next/link";
+import { BookOpen, FileSearch, NotebookPen, ShieldCheck } from "lucide-react";
 
-import { LogoGoogle, MessageIcon, VercelIcon } from "./icons";
+const capabilities = [
+  { icon: FileSearch, title: "Searches first", text: "Finds the most relevant notes, files, and links before answering." },
+  { icon: ShieldCheck, title: "Grounded answers", text: "Company claims come from trusted memory and include citations." },
+  { icon: NotebookPen, title: "Learns together", text: "Your whole team can capture context in the shared notebook." },
+];
 
 export const Overview = () => {
   return (
-    <motion.div
-      key="overview"
-      className="max-w-[500px] mt-20 mx-4 md:mx-0"
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ delay: 0.5 }}
-    >
-      <div className="border-none bg-muted/50 rounded-2xl p-6 flex flex-col gap-4 text-zinc-500 text-sm dark:text-zinc-400 dark:border-zinc-700">
-        <p className="flex flex-row justify-center gap-4 items-center text-zinc-900 dark:text-zinc-50">
-          <VercelIcon />
-          <span>+</span>
-          <MessageIcon />
-        </p>
-        <p>
-          This is an open source Chatbot template powered by the Google Gemini
-          model built with Next.js and the AI SDK by Vercel. It uses the{" "}
-          <code className="rounded-sm bg-muted-foreground/15 px-1.5 py-0.5">
-            streamText
-          </code>{" "}
-          function in the server and the{" "}
-          <code className="rounded-sm bg-muted-foreground/15 px-1.5 py-0.5">
-            useChat
-          </code>{" "}
-          hook on the client to create a seamless chat experience.
-        </p>
-        <p>
-          {" "}
-          You can learn more about the AI SDK by visiting the{" "}
-          <Link
-            className="text-blue-500 dark:text-blue-400"
-            href="https://sdk.vercel.ai/docs"
-            target="_blank"
-          >
-            Docs
-          </Link>
-          .
-        </p>
+    <motion.div key="overview" className="mx-4 mt-28 w-[calc(100%-32px)] max-w-3xl" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }}>
+      <div className="border-b pb-8 text-left sm:pb-10">
+        <p className="eyebrow">Company notebook / Ask</p>
+        <h1 className="mt-4 max-w-2xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Company memory,<br className="hidden sm:block" /> with the source attached.</h1>
+        <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">Ask a question and get a direct answer grounded in the notes, files, and links your team has approved.</p>
       </div>
+      <div className="grid sm:grid-cols-3">
+        {capabilities.map(({ icon: Icon, title, text }) => <div key={title} className="border-b py-5 sm:border-b-0 sm:border-r sm:px-5 sm:first:pl-0 sm:last:border-r-0"><Icon size={17} className="text-primary" /><h2 className="mt-3 text-sm font-semibold">{title}</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">{text}</p></div>)}
+      </div>
+      <div className="mt-5 flex items-center gap-2 text-xs text-muted-foreground"><BookOpen size={13} /> Every company claim can be traced to its source.</div>
     </motion.div>
   );
 };

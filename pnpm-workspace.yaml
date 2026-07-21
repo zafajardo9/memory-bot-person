@@ -1,0 +1,13 @@
+allowBuilds:
+  '@google/genai': true
+  '@prisma/engines': true
+  bufferutil: false
+  esbuild: true
+  prisma: true
+  protobufjs: true
+  sharp: true
+  unrs-resolver: true
+
+overrides:
+  '@hono/node-server': 1.19.14
+  postcss: 8.5.20

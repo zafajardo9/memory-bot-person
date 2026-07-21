@@ -1,28 +1,37 @@
 "use client";
 
+import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { forwardRef } from "react";
 
-export function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+import { cn } from "@/lib/utils";
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
+export const ThemeToggle = forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement>
+>(({ className, onClick, ...props }, ref) => {
+  const { setTheme, resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   return (
-    <div
-      className="cursor-pointer"
-      onClick={() => {
-        setTheme(theme === "dark" ? "light" : "dark");
+    <button
+      ref={ref}
+      type="button"
+      className={cn("flex w-full cursor-pointer items-center gap-3", className)}
+      {...props}
+      onClick={(event) => {
+        setTheme(isDark ? "light" : "dark");
+        onClick?.(event);
       }}
     >
-      {`Toggle ${theme === "light" ? "dark" : "light"} mode`}
-    </div>
+      {isDark ? (
+        <Sun size={15} className="text-muted-foreground" />
+      ) : (
+        <Moon size={15} className="text-muted-foreground" />
+      )}
+      {isDark ? "Use light theme" : "Use dark theme"}
+    </button>
   );
-}
+});
+
+ThemeToggle.displayName = "ThemeToggle";

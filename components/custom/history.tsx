@@ -9,8 +9,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
 
-import { Chat } from "@/db/schema";
-import { fetcher, getTitleFromChat } from "@/lib/utils";
+import { fetcher } from "@/lib/utils";
 
 import {
   InfoIcon,
@@ -44,6 +43,8 @@ import {
   SheetTitle,
 } from "../ui/sheet";
 
+import type { ChatSummary } from "@/db/types";
+
 export const History = ({ user }: { user: User | undefined }) => {
   const { id } = useParams();
   const pathname = usePathname();
@@ -51,10 +52,14 @@ export const History = ({ user }: { user: User | undefined }) => {
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const {
     data: history,
+    error,
     isLoading,
     mutate,
-  } = useSWR<Array<Chat>>(user ? "/api/history" : null, fetcher, {
+  } = useSWR<Array<ChatSummary>>(user ? "/api/history" : null, fetcher, {
     fallbackData: [],
+    revalidateOnFocus: false,
+    revalidateOnMount: false,
+    shouldRetryOnError: false,
   });
 
   useEffect(() => {
@@ -65,8 +70,13 @@ export const History = ({ user }: { user: User | undefined }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleDelete = async () => {
-    const deletePromise = fetch(`/api/chat?id=${deleteId}`, {
+    const targetId = deleteId;
+    if (!targetId) return;
+    const deletePromise = fetch(`/api/chat?id=${targetId}`, {
       method: "DELETE",
+    }).then((response) => {
+      if (!response.ok) throw new Error("Unable to delete conversation");
+      return response;
     });
 
     toast.promise(deletePromise, {
@@ -74,7 +84,7 @@ export const History = ({ user }: { user: User | undefined }) => {
       success: () => {
         mutate((history) => {
           if (history) {
-            return history.filter((h) => h.id !== id);
+            return history.filter((chat) => chat.id !== targetId);
           }
         });
         return "Chat deleted successfully";
@@ -88,8 +98,12 @@ export const History = ({ user }: { user: User | undefined }) => {
   return (
     <>
       <Button
-        variant="outline"
-        className="p-1.5 h-fit"
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label="Open chat history"
+        title="Chat history"
+        className="size-9 shrink-0 rounded-lg border bg-card p-0 text-muted-foreground shadow-sm hover:text-foreground"
         onClick={() => {
           setIsHistoryVisible(true);
         }}
@@ -103,7 +117,7 @@ export const History = ({ user }: { user: User | undefined }) => {
           setIsHistoryVisible(state);
         }}
       >
-        <SheetContent side="left" className="p-3 w-80 bg-muted">
+        <SheetContent side="left" className="flex w-[min(22rem,calc(100vw-1rem))] flex-col gap-0 bg-background p-0">
           <SheetHeader>
             <VisuallyHidden.Root>
               <SheetTitle className="text-left">History</SheetTitle>
@@ -113,41 +127,61 @@ export const History = ({ user }: { user: User | undefined }) => {
             </VisuallyHidden.Root>
           </SheetHeader>
 
-          <div className="text-sm flex flex-row items-center justify-between">
-            <div className="flex flex-row gap-2">
-              <div className="dark:text-zinc-300">History</div>
-
-              <div className="dark:text-zinc-400 text-zinc-500">
-                {history === undefined ? "loading" : history.length} chats
-              </div>
+          <div className="border-b px-5 pb-4 pt-5">
+            <div className="pr-8 text-base font-semibold">Chat history</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {history === undefined
+                ? "Loading conversations…"
+                : `${history.length} ${history.length === 1 ? "conversation" : "conversations"}`}
             </div>
           </div>
 
-          <div className="mt-10 flex flex-col">
+          <div className="flex min-h-0 flex-1 flex-col p-3">
             {user && (
               <Button
-                className="font-normal text-sm flex flex-row justify-between text-white"
+                className="mb-3 flex shrink-0 flex-row justify-between rounded-lg text-sm font-medium"
                 asChild
               >
                 <Link href="/">
-                  <div>Start a new chat</div>
+                  <div>New conversation</div>
                   <PencilEditIcon size={14} />
                 </Link>
               </Button>
             )}
 
-            <div className="flex flex-col overflow-y-scroll p-1 h-[calc(100dvh-124px)]">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
               {!user ? (
-                <div className="text-zinc-500 h-dvh w-full flex flex-row justify-center items-center text-sm gap-2">
-                  <InfoIcon />
-                  <div>Login to save and revisit previous chats!</div>
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-muted">
+                    <InfoIcon />
+                  </span>
+                  <div>Sign in to save and revisit conversations.</div>
                 </div>
               ) : null}
 
-              {!isLoading && history?.length === 0 && user ? (
-                <div className="text-zinc-500 h-dvh w-full flex flex-row justify-center items-center text-sm gap-2">
-                  <InfoIcon />
-                  <div>No chats found</div>
+              {!isLoading && !error && history?.length === 0 && user ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-muted">
+                    <InfoIcon />
+                  </span>
+                  <div>Your conversations will appear here.</div>
+                </div>
+              ) : null}
+
+              {!isLoading && error && user ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-sm">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                    <InfoIcon />
+                  </span>
+                  <div>
+                    <p className="font-medium">History is temporarily unavailable</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      Your conversations are safe. Try loading the list again.
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => void mutate()}>
+                    Try again
+                  </Button>
                 </div>
               ) : null}
 
@@ -156,51 +190,52 @@ export const History = ({ user }: { user: User | undefined }) => {
                   {[44, 32, 28, 52].map((item) => (
                     <div key={item} className="p-2 my-[2px]">
                       <div
-                        className={`w-${item} h-[20px] rounded-md bg-zinc-200 dark:bg-zinc-600 animate-pulse`}
+                        className={`w-${item} h-[20px] animate-pulse rounded-md bg-muted`}
                       />
                     </div>
                   ))}
                 </div>
               ) : null}
 
-              {history &&
+              {!error && history &&
                 history.map((chat) => (
                   <div
                     key={chat.id}
                     className={cx(
-                      "flex flex-row items-center gap-6 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md pr-2",
-                      { "bg-zinc-200 dark:bg-zinc-700": chat.id === id },
+                      "group flex flex-row items-center gap-1 rounded-lg pr-1 transition-colors hover:bg-muted/80",
+                      { "bg-muted": chat.id === id },
                     )}
                   >
                     <Button
                       variant="ghost"
                       className={cx(
-                        "hover:bg-zinc-200 dark:hover:bg-zinc-700 justify-between p-0 text-sm font-normal flex flex-row items-center gap-2 pr-2 w-full transition-none",
+                        "min-w-0 flex-1 justify-start p-0 text-sm font-normal hover:bg-transparent",
                       )}
                       asChild
                     >
                       <Link
                         href={`/chat/${chat.id}`}
-                        className="text-ellipsis overflow-hidden text-left py-2 pl-2 rounded-lg outline-zinc-900"
+                        className="block truncate rounded-lg p-2.5 text-left"
                       >
-                        {getTitleFromChat(chat)}
+                        {chat.title}
                       </Link>
                     </Button>
 
                     <DropdownMenu modal={true}>
                       <DropdownMenuTrigger asChild>
                         <Button
-                          className="p-0 h-fit font-normal text-zinc-500 transition-none hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                          className="size-8 shrink-0 p-0 font-normal text-muted-foreground hover:bg-muted"
                           variant="ghost"
+                          aria-label={`More options for ${chat.title}`}
                         >
                           <MoreHorizontalIcon />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent side="left" className="z-[60]">
-                        <DropdownMenuItem asChild>
-                          <Button
-                            className="flex flex-row gap-2 items-center justify-start w-full h-fit font-normal p-1.5 rounded-sm"
-                            variant="ghost"
+                      <DropdownMenuContent side="left" className="z-[60] w-36 rounded-lg p-1.5">
+                        <DropdownMenuItem asChild className="rounded-md text-destructive focus:bg-destructive/10 focus:text-destructive">
+                          <button
+                            type="button"
+                            className="flex w-full flex-row items-center justify-start gap-2"
                             onClick={() => {
                               setDeleteId(chat.id);
                               setShowDeleteDialog(true);
@@ -208,7 +243,7 @@ export const History = ({ user }: { user: User | undefined }) => {
                           >
                             <TrashIcon />
                             <div>Delete</div>
-                          </Button>
+                          </button>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

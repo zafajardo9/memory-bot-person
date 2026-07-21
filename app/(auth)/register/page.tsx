@@ -40,28 +40,36 @@ export default function Page() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl gap-12 flex flex-col">
-        <div className="flex flex-col items-center justify-center gap-2 px-4 text-center sm:px-16">
-          <h3 className="text-xl font-semibold dark:text-zinc-50">Sign Up</h3>
-          <p className="text-sm text-gray-500 dark:text-zinc-400">
-            Create an account with your email and password
-          </p>
+    <main className="page-shell flex items-center justify-center">
+      <section className="grid w-full max-w-4xl overflow-hidden border bg-card md:grid-cols-[1.1fr_0.9fr]">
+        <div className="hidden border-r bg-muted/40 p-10 md:flex md:flex-col md:justify-between">
+          <p className="eyebrow">Memory / New workspace member</p>
+          <div>
+            <h1 className="max-w-sm text-4xl font-semibold tracking-[-0.045em]">Start with shared context, not scattered answers.</h1>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">Capture what matters, approve trusted sources, and help the team find the same answer.</p>
+          </div>
         </div>
-        <AuthForm action={handleSubmit} defaultEmail={email}>
-          <SubmitButton>Sign Up</SubmitButton>
-          <p className="text-center text-sm text-gray-600 mt-4 dark:text-zinc-400">
+        <div className="p-6 sm:p-10">
+          <div className="mb-8">
+            <p className="eyebrow">Get started</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight">Create your account</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Use your work email and a secure password.</p>
+          </div>
+          <AuthForm action={handleSubmit} defaultEmail={email}>
+            <SubmitButton>Create account</SubmitButton>
+            <p className="mt-4 text-center text-sm text-muted-foreground">
             {"Already have an account? "}
             <Link
               href="/login"
-              className="font-semibold text-gray-800 hover:underline dark:text-zinc-200"
+              className="font-medium text-primary hover:underline"
             >
               Sign in
             </Link>
-            {" instead."}
-          </p>
-        </AuthForm>
-      </div>
-    </div>
+            {"."}
+            </p>
+          </AuthForm>
+        </div>
+      </section>
+    </main>
   );
 }

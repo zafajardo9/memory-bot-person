@@ -1,12 +1,13 @@
 "use client";
 
-import { Attachment, Message } from "ai";
-import { useChat } from "ai/react";
-import { useState } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type FileUIPart, type UIMessage } from "ai";
+import { useCallback, useState } from "react";
 
 import { Message as PreviewMessage } from "@/components/custom/message";
 import { useScrollToBottom } from "@/components/custom/use-scroll-to-bottom";
 
+import { ModelSelector } from "./model-selector";
 import { MultimodalInput } from "./multimodal-input";
 import { Overview } from "./overview";
 
@@ -15,30 +16,34 @@ export function Chat({
   initialMessages,
 }: {
   id: string;
-  initialMessages: Array<Message>;
+  initialMessages: UIMessage[];
 }) {
-  const { messages, handleSubmit, input, setInput, append, isLoading, stop } =
-    useChat({
-      id,
-      body: { id },
-      initialMessages,
-      maxSteps: 10,
-      onFinish: () => {
-        window.history.replaceState({}, "", `/chat/${id}`);
-      },
-    });
+  const { messages, sendMessage, status, stop } = useChat({
+    id,
+    messages: initialMessages,
+    transport: new DefaultChatTransport({ body: { id } }),
+    onFinish: () => {
+      window.history.replaceState({}, "", `/chat/${id}`);
+    },
+  });
+  const [input, setInput] = useState("");
+  const [aiAvailable, setAIAvailable] = useState(false);
+  const handleAvailabilityChange = useCallback((available: boolean) => {
+    setAIAvailable(available);
+  }, []);
 
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
 
-  const [attachments, setAttachments] = useState<Array<Attachment>>([]);
+  const [attachments, setAttachments] = useState<FileUIPart[]>([]);
+  const isLoading = status === "submitted" || status === "streaming";
 
   return (
-    <div className="flex flex-row justify-center pb-4 md:pb-8 h-dvh bg-background">
-      <div className="flex flex-col justify-between items-center gap-4">
+    <main className="flex h-dvh flex-row justify-center bg-background pb-4 md:pb-6">
+      <div className="flex w-full flex-col items-center justify-between gap-4">
         <div
           ref={messagesContainerRef}
-          className="flex flex-col gap-4 h-full w-dvw items-center overflow-y-scroll"
+          className="flex flex-col items-center gap-5 overflow-y-auto scroll-smooth size-full"
         >
           {messages.length === 0 && <Overview />}
 
@@ -46,10 +51,7 @@ export function Chat({
             <PreviewMessage
               key={message.id}
               chatId={id}
-              role={message.role}
-              content={message.content}
-              attachments={message.experimental_attachments}
-              toolInvocations={message.toolInvocations}
+              message={message}
             />
           ))}
 
@@ -59,20 +61,23 @@ export function Chat({
           />
         </div>
 
-        <form className="flex flex-row gap-2 relative items-end w-full md:max-w-[500px] max-w-[calc(100dvw-32px) px-4 md:px-0">
+        <form className="relative w-[calc(100dvw-24px)] max-w-3xl sm:w-[calc(100dvw-32px)]">
           <MultimodalInput
             input={input}
             setInput={setInput}
-            handleSubmit={handleSubmit}
             isLoading={isLoading}
+            aiAvailable={aiAvailable}
             stop={stop}
             attachments={attachments}
             setAttachments={setAttachments}
             messages={messages}
-            append={append}
+            sendMessage={sendMessage}
+            modelSelector={
+              <ModelSelector onAvailabilityChange={handleAvailabilityChange} />
+            }
           />
         </form>
       </div>
-    </div>
+    </main>
   );
 }

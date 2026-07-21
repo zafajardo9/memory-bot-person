@@ -23,7 +23,7 @@ const SAMPLE = {
 
 export function CreateReservation({ reservation = SAMPLE }) {
   return (
-    <div className="rounded-lg bg-muted p-4">
+    <div className="rounded-lg border bg-card p-4">
       <div>
         <div className="flex flex-col justify-between gap-4">
           <div className="text font-medium">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useChat } from "ai/react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { differenceInHours, format } from "date-fns";
 
 const SAMPLE = {
@@ -80,22 +81,20 @@ export function ListFlights({
   chatId: string;
   results?: typeof SAMPLE;
 }) {
-  const { append } = useChat({
+  const { sendMessage } = useChat({
     id: chatId,
-    body: { id: chatId },
-    maxSteps: 5,
+    transport: new DefaultChatTransport({ body: { id: chatId } }),
   });
 
   return (
-    <div className="rounded-lg bg-muted px-4 py-1.5 flex flex-col">
+    <div className="flex flex-col rounded-lg border bg-card px-4 py-1.5">
       {results.flights.map((flight) => (
         <div
           key={flight.id}
-          className="cursor-pointer flex flex-row border-b dark:border-zinc-700 py-2 last-of-type:border-none group"
+          className="group flex cursor-pointer flex-row border-b py-3 last-of-type:border-none hover:bg-muted/50"
           onClick={() => {
-            append({
-              role: "user",
-              content: `I would like to book the ${flight.airlines} one!`,
+            void sendMessage({
+              text: `I would like to book the ${flight.airlines} one!`,
             });
           }}
         >
@@ -136,7 +135,7 @@ export function ListFlights({
 
           <div className="flex flex-col w-32 items-end gap-0.5">
             <div className="flex flex-row gap-2">
-              <div className="text-base sm:text-base text-emerald-600 dark:text-emerald-500">
+              <div className="font-mono text-base font-medium sm:text-base">
                 ${flight.priceInUSD}
               </div>
             </div>

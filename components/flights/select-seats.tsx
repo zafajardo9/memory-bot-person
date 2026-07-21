@@ -1,7 +1,9 @@
 "use client";
 
-import { useChat } from "ai/react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import cx from "classnames";
+import { Fragment } from "react";
 
 interface Seat {
   seatNumber: string;
@@ -61,14 +63,13 @@ export function SelectSeats({
   chatId: string;
   availability?: typeof SAMPLE;
 }) {
-  const { append } = useChat({
+  const { sendMessage } = useChat({
     id: chatId,
-    body: { id: chatId },
-    maxSteps: 5,
+    transport: new DefaultChatTransport({ body: { id: chatId } }),
   });
 
   return (
-    <div className="flex flex-col gap-2 bg-muted rounded-lg">
+    <div className="flex flex-col gap-2 rounded-lg border bg-card">
       <div className="flex flex-col gap-4 scale-75">
         <div className="flex flex-row w-full justify-between text-muted-foreground">
           <div className="flex flex-row">
@@ -86,25 +87,23 @@ export function SelectSeats({
         {availability.seats.map((row, index) => (
           <div key={`row-${index}`} className="flex flex-row gap-4">
             {row.map((seat, seatIndex) => (
-              <>
+              <Fragment key={seat.seatNumber}>
                 {seatIndex === 3 ? (
                   <div className="flex flex-row items-center justify-center w-full text-muted-foreground">
                     {index + 1}
                   </div>
                 ) : null}
                 <div
-                  key={seat.seatNumber}
                   onClick={() => {
-                    append({
-                      role: "user",
-                      content: `I'd like to go with seat ${seat.seatNumber}`,
+                    void sendMessage({
+                      text: `I'd like to go with seat ${seat.seatNumber}`,
                     });
                   }}
                   className={cx(
                     "cursor-pointer group relative size-8 sm:size-10 flex-shrink-0 flex rounded-sm flex-row items-center justify-center",
                     {
-                      "bg-blue-500 hover:bg-pink-500": seat.isAvailable,
-                      "bg-gray-500 cursor-not-allowed": !seat.isAvailable,
+                      "bg-primary hover:bg-primary/85": seat.isAvailable,
+                      "cursor-not-allowed bg-muted-foreground/45": !seat.isAvailable,
                     },
                   )}
                 >
@@ -113,13 +112,13 @@ export function SelectSeats({
                     className={cx(
                       "absolute -top-1 h-2 w-full scale-125 rounded-sm",
                       {
-                        "bg-blue-600 group-hover:bg-pink-600": seat.isAvailable,
-                        "bg-zinc-600 cursor-not-allowed": !seat.isAvailable,
+                        "bg-primary group-hover:bg-primary/85": seat.isAvailable,
+                        "cursor-not-allowed bg-muted-foreground/60": !seat.isAvailable,
                       },
                     )}
                   />
                 </div>
-              </>
+              </Fragment>
             ))}
           </div>
         ))}
@@ -127,13 +126,13 @@ export function SelectSeats({
 
       <div className="flex flex-row gap-4 justify-center pb-6">
         <div className="flex flex-row items-center gap-2">
-          <div className="size-4 bg-blue-500 rounded-sm" />
+          <div className="size-4 rounded-sm bg-primary" />
           <div className="text text-muted-foreground font-medium text-sm">
             Available
           </div>
         </div>
         <div className="flex flex-row items-center gap-2">
-          <div className="size-4 bg-gray-500 rounded-sm" />
+          <div className="size-4 rounded-sm bg-muted-foreground/45" />
           <div className="text text-muted-foreground font-medium text-sm">
             Unavailable
           </div>

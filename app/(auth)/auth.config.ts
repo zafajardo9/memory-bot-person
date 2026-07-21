@@ -1,6 +1,8 @@
 import { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
+  trustHost:
+    process.env.AUTH_TRUST_HOST === "true" || process.env.NODE_ENV !== "production",
   pages: {
     signIn: "/login",
     newUser: "/",
@@ -11,10 +13,15 @@ export const authConfig = {
   ],
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
-      let isLoggedIn = !!auth?.user;
-      let isOnChat = nextUrl.pathname.startsWith("/");
-      let isOnRegister = nextUrl.pathname.startsWith("/register");
-      let isOnLogin = nextUrl.pathname.startsWith("/login");
+      const isLoggedIn = !!auth?.user;
+      const isAuthApi = nextUrl.pathname.startsWith("/api/auth");
+      const isOnChat = nextUrl.pathname.startsWith("/");
+      const isOnRegister = nextUrl.pathname.startsWith("/register");
+      const isOnLogin = nextUrl.pathname.startsWith("/login");
+
+      if (isAuthApi) {
+        return true;
+      }
 
       if (isLoggedIn && (isOnLogin || isOnRegister)) {
         return Response.redirect(new URL("/", nextUrl));
