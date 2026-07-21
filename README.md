@@ -127,7 +127,9 @@ Open [http://localhost:3000](http://localhost:3000), register the first account,
    ```
 
 3. Deploy with Vercel's default `pnpm build` command. The application build does
-   not run migrations or require a live database connection.
+   not run migrations or require a live database connection. It validates that
+   `AUTH_SECRET` and `POSTGRES_URL` are present before compiling, so a deployment
+   with broken authentication cannot be published accidentally.
 
 Use `DIRECT_DATABASE_URL` for migration commands when the runtime
 `POSTGRES_URL` points to Prisma Accelerate. Apply migrations once before routing

@@ -27,9 +27,16 @@ export default function Page() {
     } else if (state.status === "failed") {
       toast.error("Failed to create account");
     } else if (state.status === "invalid_data") {
-      toast.error("Failed validating your submission!");
+      toast.error("Check your account details", {
+        description: "Use a valid email and a password between 6 and 72 characters.",
+      });
+    } else if (state.status === "unavailable") {
+      toast.error("Registration is temporarily unavailable", {
+        description: "The authentication service could not complete your request.",
+      });
     } else if (state.status === "success") {
       toast.success("Account created successfully");
+      router.replace("/");
       router.refresh();
     }
   }, [state, router]);

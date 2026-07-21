@@ -2,7 +2,9 @@ import { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
   trustHost:
-    process.env.AUTH_TRUST_HOST === "true" || process.env.NODE_ENV !== "production",
+    process.env.AUTH_TRUST_HOST === "true" ||
+    process.env.VERCEL === "1" ||
+    process.env.NODE_ENV !== "production",
   pages: {
     signIn: "/login",
     newUser: "/",

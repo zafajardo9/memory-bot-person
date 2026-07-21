@@ -60,7 +60,30 @@ export default function Page() {
       toast.error("Check your sign-in details", {
         description: "Enter a valid email and a password with at least 6 characters.",
       });
+    } else if (state.status === "unavailable") {
+      toast.error("Sign-in is temporarily unavailable", {
+        description: "The authentication service is not configured correctly. Try again later.",
+      });
     } else if (state.status === "success") {
+      const callbackUrl = new URLSearchParams(window.location.search).get(
+        "callbackUrl",
+      );
+      let destination = "/";
+
+      if (callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//")) {
+        destination = callbackUrl;
+      } else if (callbackUrl) {
+        try {
+          const parsed = new URL(callbackUrl);
+          if (parsed.origin === window.location.origin) {
+            destination = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+          }
+        } catch {
+          // Ignore malformed or cross-origin callback URLs.
+        }
+      }
+
+      router.replace(destination);
       router.refresh();
     }
   }, [state, router]);
@@ -81,6 +104,11 @@ export default function Page() {
             title: "We couldn't sign you in",
             detail: "Check your email and password, then try again.",
           }
+        : state.status === "unavailable"
+          ? {
+              title: "Sign-in is temporarily unavailable",
+              detail: "The authentication service needs attention. Please try again later.",
+            }
         : null;
 
   return (

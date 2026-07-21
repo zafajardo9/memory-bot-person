@@ -8,11 +8,12 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && pnpm validate:env && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "validate:env": "tsx scripts/validate-deployment-env.ts",
     "verify:knowledge": "NODE_OPTIONS=--conditions=react-server tsx scripts/verify-knowledge.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
