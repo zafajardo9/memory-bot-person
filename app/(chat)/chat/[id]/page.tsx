@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
 import { Chat as PreviewChat } from "@/components/custom/chat";
@@ -8,6 +8,9 @@ import { convertToUIMessages } from "@/lib/utils";
 import type { Chat } from "@/db/types";
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
   const { id } = await params;
   const chatFromDb = await getChatById({ id });
 
@@ -20,12 +23,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     ...chatFromDb,
     messages: convertToUIMessages(chatFromDb.messages as unknown[]),
   };
-
-  const session = await auth();
-
-  if (!session || !session.user) {
-    return notFound();
-  }
 
   if (session.user.id !== chat.userId) {
     return notFound();

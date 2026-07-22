@@ -1,9 +1,20 @@
+import { anthropicProviderAdapter } from "./anthropic";
+import { deepseekProviderAdapter } from "./deepseek";
 import { googleProviderAdapter } from "./google";
+import { groqProviderAdapter } from "./groq";
+import { mistralProviderAdapter } from "./mistral";
 import { openAIProviderAdapter } from "./openai";
 
 import type { AIProviderAdapter } from "./types";
 
-const providerAdapters = [googleProviderAdapter, openAIProviderAdapter] as const;
+const providerAdapters = [
+  googleProviderAdapter,
+  openAIProviderAdapter,
+  anthropicProviderAdapter,
+  deepseekProviderAdapter,
+  mistralProviderAdapter,
+  groqProviderAdapter,
+] as const;
 
 const providerRegistry = new Map<string, AIProviderAdapter>(
   providerAdapters.map((provider) => [provider.id, provider]),

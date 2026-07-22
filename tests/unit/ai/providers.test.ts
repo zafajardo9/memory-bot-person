@@ -8,20 +8,25 @@ import {
 } from "../../../ai/providers/registry";
 
 describe("AI provider registry", () => {
-  it("registers Google and OpenAI behind the same adapter contract", () => {
+  it("registers all providers behind the same adapter contract", () => {
     expect(listAIProviderAdapters().map((provider) => provider.id)).toEqual([
       "google",
       "openai",
+      "anthropic",
+      "deepseek",
+      "mistral",
+      "groq",
     ]);
     expect(getAIProviderAdapter("google").environmentKey).toBe(
       "GOOGLE_GENERATIVE_AI_API_KEY",
     );
     expect(getAIProviderAdapter("openai").environmentKey).toBe("OPENAI_API_KEY");
+    expect(getAIProviderAdapter("deepseek").environmentKey).toBe("DEEPSEEK_API_KEY");
   });
 
   it("rejects unknown provider identifiers", () => {
-    expect(isAIProviderId("anthropic")).toBe(false);
-    expect(() => getAIProviderAdapter("anthropic")).toThrow(
+    expect(isAIProviderId("nonexistent")).toBe(false);
+    expect(() => getAIProviderAdapter("nonexistent")).toThrow(
       "Unsupported AI provider",
     );
   });
