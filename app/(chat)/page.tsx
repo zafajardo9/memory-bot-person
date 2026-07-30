@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/custom/chat";
+import { getDefaultAgentForUser } from "@/db/agent-queries";
 import { generateUUID } from "@/lib/utils";
 
 export default async function Page() {
@@ -9,5 +10,14 @@ export default async function Page() {
   if (!session?.user?.id) redirect("/login");
 
   const id = generateUUID();
-  return <Chat key={id} id={id} initialMessages={[]} />;
+  const agent = await getDefaultAgentForUser(session.user.id);
+  return (
+    <Chat
+      key={id}
+      id={id}
+      initialMessages={[]}
+      agentId={agent.id}
+      agentName={agent.name}
+    />
+  );
 }

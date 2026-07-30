@@ -1,7 +1,7 @@
 import { auth } from "@/app/(auth)/auth";
 import { getChatsByUserId } from "@/db/queries";
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
 
   if (!session || !session.user) {
@@ -9,7 +9,9 @@ export async function GET() {
   }
 
   try {
-    const chats = await getChatsByUserId({ id: session.user.id });
+    const agentId =
+      new URL(request.url).searchParams.get("agentId") ?? undefined;
+    const chats = await getChatsByUserId({ id: session.user.id, agentId });
     return Response.json(chats);
   } catch (error) {
     console.error("Unable to load chat history", {

@@ -16,6 +16,7 @@ export type Chat = Omit<PrismaChat, "messages"> & {
 
 export interface ChatSummary {
   id: string;
+  agentId: string;
   createdAt: Date;
   title: string;
 }

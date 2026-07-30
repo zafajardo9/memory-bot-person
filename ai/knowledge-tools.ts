@@ -7,14 +7,28 @@ import {
 import { knowledgeSearchSchema } from "@/lib/knowledge/validation";
 import { prisma } from "@/lib/prisma";
 
-export function createKnowledgeTools({ userId, chatId }: { userId: string; chatId: string }) {
+export function createKnowledgeTools({
+  userId,
+  chatId,
+  agentId,
+}: {
+  userId: string;
+  chatId: string;
+  agentId: string;
+}) {
   return {
     searchCompanyKnowledge: {
       description:
         "Search the approved company knowledge base. Always use this first for company work, policy, process, project, responsibility, or how-to questions.",
       inputSchema: knowledgeSearchSchema,
       execute: async ({ query, limit }: z.infer<typeof knowledgeSearchSchema>) => {
-        const results = await searchCompanyKnowledge({ query, limit, userId, chatId });
+        const results = await searchCompanyKnowledge({
+          query,
+          limit,
+          userId,
+          chatId,
+          agentId,
+        });
         return {
           query,
           found: results.length > 0,
@@ -33,7 +47,7 @@ export function createKnowledgeTools({ userId, chatId }: { userId: string; chatI
         chunkIds: z.array(z.string().uuid()).min(1).max(10),
       }),
       execute: async ({ chunkIds }: { chunkIds: string[] }) => ({
-        sources: await readCompanyKnowledge(chunkIds),
+        sources: await readCompanyKnowledge(chunkIds, agentId),
         instruction: "Answer from these passages and cite each company-specific claim.",
       }),
     },
@@ -42,7 +56,10 @@ export function createKnowledgeTools({ userId, chatId }: { userId: string; chatI
       inputSchema: z.object({}),
       execute: async () => ({
         sources: await prisma.knowledgeSource.findMany({
-          where: { status: "APPROVED" },
+          where: {
+            status: "APPROVED",
+            agents: { some: { agentId } },
+          },
           orderBy: { title: "asc" },
           select: { id: true, title: true, type: true, tags: true, lastIndexedAt: true },
         }),

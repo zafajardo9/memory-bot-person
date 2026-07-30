@@ -6,6 +6,8 @@ import {
   MessageSquareText,
   Settings2,
   ShieldCheck,
+  SlidersHorizontal,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -156,6 +158,21 @@ export function NavigationBar({
                   </Link>
                 </DropdownMenuItem>
               ) : null}
+              <DropdownMenuItem asChild className="h-10 gap-3 rounded-lg">
+                  <Link href="/agents">
+                  <SlidersHorizontal
+                    size={15}
+                    className="text-muted-foreground"
+                  />
+                  Agent workspace
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="h-10 gap-3 rounded-lg">
+                <Link href="/tools">
+                  <Wrench size={15} className="text-muted-foreground" />
+                  Tool integrations
+                </Link>
+              </DropdownMenuItem>
               {user.role === "ADMIN" ? (
                 <DropdownMenuItem asChild className="h-10 gap-3 rounded-lg">
                   <Link href="/settings/ai">

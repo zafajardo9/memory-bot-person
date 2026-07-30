@@ -3,13 +3,23 @@ import {
   stepCountIs,
   streamText,
   type UIMessage,
+  wrapLanguageModel,
 } from "ai";
 
+import { createMemoryMiddleware } from "@/ai/custom-middleware";
 import { companyAssistantSystemPrompt } from "@/ai/prompts/company-assistant";
 import { resolveUserLanguageModel } from "@/ai/providers/service";
 import { createChatTools } from "@/ai/tools";
+import { getAgentForUser } from "@/db/agent-queries";
+import { formatAgentSettingsForPrompt } from "@/lib/agent-settings";
+import { agentSettingsFromProfile, toolEnabled } from "@/lib/agents";
 import { isKnowledgeChatEnabled } from "@/lib/knowledge/config";
 import { searchCompanyKnowledge } from "@/lib/knowledge/retrieval";
+import {
+  hasWebResearchConsent,
+  linkToolPlan,
+  webResearchInstruction,
+} from "@/lib/web/consent";
 
 function latestUserText(messages: UIMessage[]) {
   const latest = [...messages].reverse().find((message) => message.role === "user");
@@ -25,8 +35,13 @@ async function knowledgePreflight(
   messages: UIMessage[],
   userId: string,
   chatId: string,
+  agentId: string,
+  enabledTools: string[],
 ) {
-  if (!isKnowledgeChatEnabled()) return "";
+  if (
+    !isKnowledgeChatEnabled() ||
+    !toolEnabled(enabledTools, "knowledge")
+  ) return "";
   const query = latestUserText(messages);
   if (!query) return "";
   try {
@@ -34,6 +49,7 @@ async function knowledgePreflight(
       query,
       userId,
       chatId,
+      agentId,
       limit: 4,
     });
     return matches.length
@@ -51,8 +67,16 @@ export async function streamCompanyChat(input: {
   chatId: string;
   messages: UIMessage[];
   userId: string;
+  agentId: string;
 }) {
-  const selected = await resolveUserLanguageModel(input.userId);
+  const userText = latestUserText(input.messages);
+  const webAccessApproved = hasWebResearchConsent(input.messages);
+  const agent = await getAgentForUser(input.agentId, input.userId);
+  if (!agent) throw new Error("Agent not found.");
+  const [selected] = await Promise.all([
+    resolveUserLanguageModel(input.userId, input.agentId),
+  ]);
+  const agentSettings = agentSettingsFromProfile(agent);
   const modelMessages = (
     await convertToModelMessages(input.messages, {
       ignoreIncompleteToolCalls: true,
@@ -62,23 +86,63 @@ export async function streamCompanyChat(input: {
     input.messages,
     input.userId,
     input.chatId,
+    input.agentId,
+    agent.enabledTools,
   );
+  const model =
+    typeof selected.model === "string" ||
+    !toolEnabled(agent.enabledTools, "memory")
+      ? selected.model
+      : wrapLanguageModel({
+          model: selected.model,
+          middleware: createMemoryMiddleware(input.userId, input.agentId),
+        });
+
+  const tools = await createChatTools({
+    model: selected.model,
+    userId: input.userId,
+    chatId: input.chatId,
+    agentId: input.agentId,
+    enabledTools: agent.enabledTools,
+    webAccessApproved,
+  });
+  const linkPlan = linkToolPlan(userText, {
+    readWebPage: "readWebPage" in tools,
+    browseWebPage: "browseWebPage" in tools,
+    webSearch: "webSearch" in tools,
+  });
 
   const result = streamText({
-    model: selected.model,
-    system: `${companyAssistantSystemPrompt}\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`,
+    model,
+    system: `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText)}\n\n${formatAgentSettingsForPrompt(agentSettings)}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`,
     messages: modelMessages,
     stopWhen: stepCountIs(10),
-    tools: createChatTools({
-      model: selected.model,
-      userId: input.userId,
-      chatId: input.chatId,
-    }),
+    tools,
+    prepareStep: ({ stepNumber }) => {
+      if (stepNumber === 0 && linkPlan.reader) {
+        return {
+          activeTools: [linkPlan.reader],
+          toolChoice: { type: "tool", toolName: linkPlan.reader },
+        };
+      }
+      if (stepNumber === 1 && linkPlan.expandWithSearch) {
+        return {
+          activeTools: ["webSearch"],
+          toolChoice: { type: "tool", toolName: "webSearch" },
+        };
+      }
+      return {};
+    },
     experimental_telemetry: {
       isEnabled: true,
       functionId: `chat:${selected.providerId}:${selected.modelId}`,
     },
   });
 
-  return { result, selection: selected };
+  return {
+    result,
+    selection: selected,
+    extractionModel: selected.model,
+    memoryEnabled: toolEnabled(agent.enabledTools, "memory"),
+  };
 }

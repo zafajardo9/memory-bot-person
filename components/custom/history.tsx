@@ -3,7 +3,7 @@
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import cx from "classnames";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { User } from "next-auth";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -48,6 +48,8 @@ import type { ChatSummary } from "@/db/types";
 export const History = ({ user }: { user: User | undefined }) => {
   const { id } = useParams();
   const pathname = usePathname();
+  const router = useRouter();
+  const agentId = pathname.match(/^\/agents\/([^/]+)\/chat/)?.[1];
 
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const {
@@ -55,12 +57,18 @@ export const History = ({ user }: { user: User | undefined }) => {
     error,
     isLoading,
     mutate,
-  } = useSWR<Array<ChatSummary>>(user ? "/api/history" : null, fetcher, {
+  } = useSWR<Array<ChatSummary>>(
+    user
+      ? `/api/history${agentId ? `?agentId=${encodeURIComponent(agentId)}` : ""}`
+      : null,
+    fetcher,
+    {
     fallbackData: [],
     revalidateOnFocus: false,
     revalidateOnMount: false,
     shouldRetryOnError: false,
-  });
+    },
+  );
 
   useEffect(() => {
     mutate();
@@ -87,6 +95,9 @@ export const History = ({ user }: { user: User | undefined }) => {
             return history.filter((chat) => chat.id !== targetId);
           }
         });
+        if (targetId === id) {
+          router.push("/");
+        }
         return "Chat deleted successfully";
       },
       error: "Failed to delete chat",
@@ -142,7 +153,7 @@ export const History = ({ user }: { user: User | undefined }) => {
                 className="mb-3 flex shrink-0 flex-row justify-between rounded-lg text-sm font-medium"
                 asChild
               >
-                <Link href="/">
+                <Link href={agentId ? `/agents/${agentId}/chat` : "/"}>
                   <div>New conversation</div>
                   <PencilEditIcon size={14} />
                 </Link>

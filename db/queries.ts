@@ -2,6 +2,7 @@ import "server-only";
 
 import { genSaltSync, hashSync } from "bcrypt-ts";
 
+import { ensureDefaultAgent } from "@/db/agent-queries";
 import { prisma } from "@/lib/prisma";
 
 import type { ChatSummary, User } from "./types";
@@ -34,32 +35,44 @@ export async function createUser(email: string, password: string) {
   const normalizedEmail = email.toLowerCase();
   const passwordHash = hashSync(password, genSaltSync(10));
 
-  return prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       email: normalizedEmail,
       password: passwordHash,
       role: isConfiguredAdmin(normalizedEmail) ? "ADMIN" : "MEMBER",
     },
   });
+  await ensureDefaultAgent(user.id);
+  return user;
 }
 
 export async function saveChat({
   id,
   messages,
   userId,
+  agentId,
 }: {
   id: string;
   messages: unknown;
   userId: string;
+  agentId: string;
 }) {
   const existing = await prisma.chat.findUnique({
     where: { id },
-    select: { userId: true },
+    select: { userId: true, agentId: true },
   });
 
   if (existing && existing.userId !== userId) {
     throw new Error("Cannot update another user's chat");
   }
+  if (existing && existing.agentId !== agentId) {
+    throw new Error("A chat cannot be moved to another agent.");
+  }
+  const agent = await prisma.agent.findFirst({
+    where: { id: agentId, userId },
+    select: { id: true },
+  });
+  if (!agent) throw new Error("Agent not found.");
 
   return prisma.chat.upsert({
     where: { id },
@@ -67,6 +80,7 @@ export async function saveChat({
       id,
       messages: messages as unknown as Prisma.InputJsonValue,
       userId,
+      agentId,
     },
     update: {
       messages: messages as unknown as Prisma.InputJsonValue,
@@ -78,11 +92,18 @@ export async function deleteChatById({ id }: { id: string }) {
   return prisma.chat.delete({ where: { id } });
 }
 
-export async function getChatsByUserId({ id }: { id: string }) {
+export async function getChatsByUserId({
+  id,
+  agentId,
+}: {
+  id: string;
+  agentId?: string;
+}) {
   return prisma.$queryRaw<Array<ChatSummary>>`
     SELECT
       "id",
       "createdAt",
+      "agentId",
       LEFT(
         COALESCE(
           NULLIF("messages"->0->'parts'->0->>'text', ''),
@@ -94,6 +115,7 @@ export async function getChatsByUserId({ id }: { id: string }) {
       ) AS "title"
     FROM "Chat"
     WHERE "userId" = ${id}::uuid
+      AND (${agentId ?? null}::uuid IS NULL OR "agentId" = ${agentId ?? null}::uuid)
     ORDER BY "createdAt" DESC
     LIMIT 100
   `;

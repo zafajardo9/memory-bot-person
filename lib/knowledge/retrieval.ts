@@ -32,6 +32,7 @@ export async function searchCompanyKnowledge(input: {
   query: string;
   userId: string;
   chatId?: string;
+  agentId: string;
   limit?: number;
 }): Promise<KnowledgeSearchResult[]> {
   const startedAt = Date.now();
@@ -57,6 +58,9 @@ export async function searchCompanyKnowledge(input: {
     FROM "KnowledgeChunk" chunk
     JOIN "KnowledgeSourceVersion" version ON version."id" = chunk."versionId"
     JOIN "KnowledgeSource" source ON source."id" = version."sourceId"
+    JOIN "AgentKnowledgeSource" assignment
+      ON assignment."sourceId" = source."id"
+      AND assignment."agentId" = ${input.agentId}::uuid
     WHERE source."status" = 'APPROVED'::"KnowledgeSourceStatus"
       AND version."status" = 'APPROVED'::"KnowledgeVersionStatus"
       AND source."currentVersionId" = version."id"
@@ -73,6 +77,7 @@ export async function searchCompanyKnowledge(input: {
     data: {
       userId: input.userId,
       chatId: input.chatId,
+      agentId: input.agentId,
       query: input.query,
       retrievedChunkIds: results.map((result) => result.chunkId),
       resultCount: results.length,
@@ -83,13 +88,16 @@ export async function searchCompanyKnowledge(input: {
   return results;
 }
 
-export async function readCompanyKnowledge(chunkIds: string[]) {
+export async function readCompanyKnowledge(chunkIds: string[], agentId: string) {
   const selected = await prisma.knowledgeChunk.findMany({
     where: {
       id: { in: chunkIds.slice(0, 10) },
       version: {
         status: "APPROVED",
-        source: { status: "APPROVED" },
+        source: {
+          status: "APPROVED",
+          agents: { some: { agentId } },
+        },
       },
     },
     include: {

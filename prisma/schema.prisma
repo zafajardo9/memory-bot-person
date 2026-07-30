@@ -54,9 +54,67 @@ model User {
   knowledgeAudits  KnowledgeAuditEvent[]
   knowledgeQueries KnowledgeQueryLog[]
   providerConfigs  AiProviderConfig[]       @relation("AIProviderConfigUpdater")
+  integrationCredentials IntegrationCredential[] @relation("IntegrationCredentialUpdater")
   aiSelection      UserAiSelection?
+  agentSettings    UserAgentSettings?
+  memories         UserMemory[]
+  agents           Agent[]
+  webSearchUsage   WebSearchUsage[]
 
   @@map("User")
+}
+
+model Agent {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  userId             String                 @db.Uuid
+  slug               String                 @db.VarChar(60)
+  name               String                 @db.VarChar(60)
+  description        String                 @default("") @db.VarChar(240)
+  avatar             String                 @default("spark") @db.VarChar(30)
+  color              String                 @default("violet") @db.VarChar(30)
+  mood               String                 @default("balanced") @db.VarChar(30)
+  responseLength     String                 @default("balanced") @db.VarChar(30)
+  customInstructions String                 @default("") @db.Text
+  providerId         String?                @db.VarChar(50)
+  modelId            String?                @db.VarChar(200)
+  enabledTools       String[]               @default(["knowledge", "memory", "web", "browser", "weather", "flights"])
+  isDefault          Boolean                @default(false)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  user               User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chats              Chat[]
+  memories           UserMemory[]
+  knowledgeSources   AgentKnowledgeSource[]
+  knowledgeQueries   KnowledgeQueryLog[]
+
+  @@unique([userId, slug])
+  @@index([userId, isDefault])
+  @@map("Agent")
+}
+
+model AgentKnowledgeSource {
+  agentId  String          @db.Uuid
+  sourceId String          @db.Uuid
+  addedAt  DateTime        @default(now())
+  agent    Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  source   KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([agentId, sourceId])
+  @@index([sourceId])
+  @@map("AgentKnowledgeSource")
+}
+
+model UserAgentSettings {
+  userId             String   @id @db.Uuid
+  agentName          String   @default("Memory") @db.VarChar(60)
+  mood               String   @default("balanced") @db.VarChar(30)
+  responseLength     String   @default("balanced") @db.VarChar(30)
+  customInstructions String   @default("") @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("UserAgentSettings")
 }
 
 model AiProviderConfig {
@@ -70,6 +128,17 @@ model AiProviderConfig {
 
   @@index([updatedById])
   @@map("AIProviderConfig")
+}
+
+model IntegrationCredential {
+  integrationId String   @id @db.VarChar(80)
+  encryptedValue String  @db.Text
+  updatedById   String   @db.Uuid
+  updatedAt     DateTime @updatedAt
+  updatedBy     User     @relation("IntegrationCredentialUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([updatedById])
+  @@map("IntegrationCredential")
 }
 
 model UserAiSelection {
@@ -88,9 +157,12 @@ model Chat {
   createdAt DateTime @default(now())
   messages  Json
   userId    String   @db.Uuid
+  agentId   String   @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([agentId, createdAt])
   @@map("Chat")
 }
 
@@ -127,6 +199,7 @@ model KnowledgeSource {
   currentVersion   KnowledgeSourceVersion?  @relation("CurrentKnowledgeVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   jobs             KnowledgeIngestionJob[]
   audits           KnowledgeAuditEvent[]
+  agents           AgentKnowledgeSource[]
 
   @@index([status, updatedAt])
   @@index([createdById])
@@ -143,6 +216,8 @@ model KnowledgeSourceVersion {
   metadata         Json?
   errorMessage     String?                 @db.Text
   embeddingModel   String?                 @db.VarChar(100)
+  storageProvider  String?                 @db.VarChar(20)
+  storageRef       String?                 @db.VarChar(255)
   approvedById     String?                 @db.Uuid
   approvedAt       DateTime?
   createdAt        DateTime                @default(now())
@@ -212,12 +287,47 @@ model KnowledgeQueryLog {
   id                String   @id @default(uuid()) @db.Uuid
   userId            String   @db.Uuid
   chatId            String?  @db.Uuid
+  agentId           String   @db.Uuid
   query             String   @db.VarChar(1000)
   retrievedChunkIds String[] @default([])
   resultCount       Int
   latencyMs         Int
   createdAt         DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent             Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([agentId, createdAt])
+}
+
+model UserMemory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  agentId   String   @db.Uuid
+  title     String   @db.VarChar(200)
+  content   String   @db.Text
+  tags      String[] @default([])
+  category  String   @default("fact") @db.VarChar(50)
+  priority  Int      @default(0)
+  source    String   @default("manual") @db.VarChar(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, category])
+  @@index([userId, priority, updatedAt])
+  @@index([agentId, priority, updatedAt])
+  @@map("UserMemory")
+}
+
+model WebSearchUsage {
+  userId    String   @db.Uuid
+  day       DateTime @db.Date
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+  @@map("WebSearchUsage")
 }

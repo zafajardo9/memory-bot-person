@@ -126,14 +126,20 @@ function statusLabel(status: string) {
 export function KnowledgeManager({
   isAdmin,
   currentUserId,
+  agentId,
+  agentName,
 }: {
   isAdmin: boolean;
   currentUserId: string;
+  agentId: string;
+  agentName: string;
 }) {
   const { data, error, isLoading, mutate } = useSWR<{
     sources: SourceSummary[];
     usage: KnowledgeUsage;
-  }>("/api/knowledge", fetcher, { refreshInterval: 3_000 });
+  }>(`/api/knowledge?agentId=${encodeURIComponent(agentId)}`, fetcher, {
+    refreshInterval: 3_000,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [query, setQuery] = useState("");
@@ -203,6 +209,7 @@ export function KnowledgeManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "NOTE",
+          agentId,
           title: form.get("title"),
           content,
           tags: String(form.get("tags") ?? "")
@@ -214,7 +221,7 @@ export function KnowledgeManager({
       formElement.reset();
       if (noteEditorRef.current) noteEditorRef.current.innerHTML = "";
       setComposerOpen(false);
-      toast.success("Note added to shared memory and queued for learning.");
+      toast.success(`Note added to ${agentName}’s notebook and queued for learning.`);
       await mutate();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save note");
@@ -228,14 +235,16 @@ export function KnowledgeManager({
     const formElement = event.currentTarget;
     setIsSubmitting(true);
     try {
+      const upload = new FormData(formElement);
+      upload.set("agentId", agentId);
       await mutateSource("/api/knowledge", {
         method: "POST",
-        body: new FormData(formElement),
+        body: upload,
       });
       formElement.reset();
       setSelectedFileName("");
       setComposerOpen(false);
-      toast.success("File added to shared memory. Deep scan started.");
+      toast.success(`File added to ${agentName}’s notebook. Deep scan started.`);
       await mutate();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Upload failed");
@@ -254,6 +263,7 @@ export function KnowledgeManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          agentId,
           title: form.get("title"),
           url: form.get("url"),
           tags: String(form.get("tags") ?? "")
@@ -309,13 +319,13 @@ export function KnowledgeManager({
               <Library size={20} />
             </span>
             <div className="max-w-2xl">
-              <p className="eyebrow">Shared company knowledge</p>
+              <p className="eyebrow">{agentName} · dedicated notebook</p>
               <h1 className="mt-2 text-balance text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
                 Knowledge workspace
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Give Memory the context your team relies on. Add sources, review
-                what it learned, and publish trusted knowledge for everyone.
+                Give {agentName} the sources it should know. This notebook view is
+                isolated from your other agents.
               </p>
             </div>
           </div>
@@ -354,7 +364,7 @@ export function KnowledgeManager({
               </p>
             </div>
             <span className="hidden text-xs text-muted-foreground sm:block">
-              Shared with your workspace
+              Available only to {agentName}
             </span>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
@@ -398,9 +408,11 @@ export function KnowledgeManager({
           <div className="mb-4 flex flex-col gap-4 border-t pt-8 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="eyebrow">Source library</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight">Team notebook</h2>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight">
+                {agentName}’s notebook
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Browse, review, and manage everything Memory can reference.
+                Browse and manage the sources this agent can reference.
               </p>
             </div>
             <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2 sm:w-auto">

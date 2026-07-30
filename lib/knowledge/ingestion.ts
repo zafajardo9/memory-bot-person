@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 
 import { asJson } from "@/db/knowledge-queries";
 import { prisma } from "@/lib/prisma";
+import { downloadKnowledgeFile } from "@/lib/storage/imagekit";
 
 import { chunkSections } from "./chunking";
 import { isKnowledgeIndexingEnabled } from "./config";
@@ -28,6 +29,21 @@ async function extractBytes(bytes: Uint8Array, mimeType: string, sourceUrl?: str
     return extractDocx(bytes, sourceUrl);
   }
   return extractStructuredText(new TextDecoder().decode(bytes), sourceUrl);
+}
+
+async function resolveFileBytes(version: {
+  originalContent: Uint8Array<ArrayBuffer> | null;
+  storageProvider: string | null;
+  storageRef: string | null;
+}): Promise<Uint8Array> {
+  if (version.storageProvider === "imagekit" && version.storageRef) {
+    try {
+      return await downloadKnowledgeFile(version.storageRef);
+    } catch (error) {
+      console.error("ImageKit download failed, falling back to stored content:", error);
+    }
+  }
+  return new Uint8Array(version.originalContent ?? []);
 }
 
 async function extractUrlSource(url: string, crawlDepth: number, crawlLimit: number) {
@@ -103,7 +119,7 @@ export async function processKnowledgeJob(jobId: string) {
     const document =
       job.source.type === "FILE" || job.source.type === "NOTE"
         ? await extractBytes(
-            new Uint8Array(job.version.originalContent ?? []),
+            await resolveFileBytes(job.version),
             job.source.mimeType ?? "text/plain",
           )
         : await extractUrlSource(

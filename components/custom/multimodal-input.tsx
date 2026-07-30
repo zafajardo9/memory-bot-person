@@ -1,7 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { FileUp, ImagePlus } from "lucide-react";
+import {
+  FileUp,
+  ImagePlus,
+  Lightbulb,
+  SlidersHorizontal,
+} from "lucide-react";
+import Link from "next/link";
 import React, {
   useRef,
   useEffect,
@@ -13,6 +18,7 @@ import React, {
 } from "react";
 import { toast } from "sonner";
 
+import { ChatErrorNotice } from "./chat-error-notice";
 import { ArrowUpIcon, StopIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
 import useWindowSize from "./use-window-size";
@@ -45,6 +51,12 @@ export function MultimodalInput({
   messages,
   sendMessage,
   modelSelector,
+  thinking,
+  onThinkingChange,
+  agentName,
+  chatError,
+  clearChatError,
+  retryLastMessage,
 }: {
   input: string;
   setInput: (value: string) => void;
@@ -59,6 +71,12 @@ export function MultimodalInput({
     options?: ChatRequestOptions,
   ) => Promise<void>;
   modelSelector: React.ReactNode;
+  thinking: boolean;
+  onThinkingChange: (value: boolean) => void;
+  agentName: string;
+  chatError?: Error;
+  clearChatError: () => void;
+  retryLastMessage: () => Promise<void>;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -167,30 +185,19 @@ export function MultimodalInput({
       {messages.length === 0 &&
         attachments.length === 0 &&
         uploadQueue.length === 0 && (
-          <div className="mx-auto grid w-full overflow-hidden rounded-xl border bg-card sm:grid-cols-2 sm:divide-x">
-            {suggestedActions.map((suggestedAction, index) => (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={{ delay: 0.05 * index }}
-                key={index}
-                className={index > 1 ? "hidden sm:block" : "block"}
+          <div className="mx-auto flex w-full flex-wrap items-center justify-center gap-2 py-1">
+            {suggestedActions.map((suggestedAction) => (
+              <button
+                key={suggestedAction.title}
+                type="button"
+                disabled={!aiAvailable}
+                onClick={async () => {
+                  await sendMessage({ text: suggestedAction.action });
+                }}
+                className="rounded-full border bg-card px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <button
-                  type="button"
-                  disabled={!aiAvailable}
-                  onClick={async () => {
-                    await sendMessage({ text: suggestedAction.action });
-                  }}
-                  className="flex w-full flex-col p-3.5 text-left text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <span className="font-medium">{suggestedAction.title}</span>
-                  <span className="text-muted-foreground">
-                    {suggestedAction.label}
-                  </span>
-                </button>
-              </motion.div>
+                {suggestedAction.title}
+              </button>
             ))}
           </div>
         )}
@@ -215,6 +222,17 @@ export function MultimodalInput({
       />
 
       <div className="overflow-hidden rounded-[20px] border bg-card shadow-[0_8px_30px_hsl(var(--foreground)/0.07)] transition-[border-color,box-shadow] focus-within:border-primary/35 focus-within:shadow-[0_10px_36px_hsl(var(--foreground)/0.1)]">
+        {chatError ? (
+          <ChatErrorNotice
+            error={chatError}
+            onDismiss={clearChatError}
+            onRetry={() => {
+              clearChatError();
+              void retryLastMessage();
+            }}
+          />
+        ) : null}
+
         {(attachments.length > 0 || uploadQueue.length > 0) && (
           <div className="flex gap-2 overflow-x-auto px-3 pb-1 pt-3">
             {attachments.map((attachment) => (
@@ -244,11 +262,15 @@ export function MultimodalInput({
           </div>
         )}
 
+        <div className="border-b border-border/60 px-4 py-1.5">
+          {modelSelector}
+        </div>
+
         <Textarea
           ref={textareaRef}
           placeholder={
             aiAvailable
-              ? "Message Memory…"
+              ? `Message ${agentName}…`
               : "Connect an AI provider to begin…"
           }
           disabled={!aiAvailable}
@@ -270,9 +292,36 @@ export function MultimodalInput({
         />
 
         <div className="flex min-h-12 items-center gap-2 px-2.5 pb-2.5">
-          <div className="min-w-0 flex-1">{modelSelector}</div>
+          <button
+            type="button"
+            onClick={() => onThinkingChange(!thinking)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+              thinking
+                ? "border-primary/25 bg-primary/10 text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            title={thinking ? "Reasoning on" : "Reasoning off"}
+            aria-label={thinking ? "Disable reasoning" : "Enable reasoning"}
+          >
+            <Lightbulb size={13} />
+            Think
+          </button>
+          <div className="min-w-0 flex-1" />
 
           <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              title={`Tune ${agentName}`}
+              aria-label={`Tune ${agentName}`}
+              className="size-8 rounded-full text-muted-foreground hover:text-foreground"
+              asChild
+            >
+              <Link href="/settings/agent">
+                <SlidersHorizontal size={16} />
+              </Link>
+            </Button>
             <Button
               type="button"
               size="icon"

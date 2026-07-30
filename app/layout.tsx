@@ -2,6 +2,7 @@ import { Xray } from "@stinsky/xray";
 import { Metadata } from "next";
 import { Toaster } from "sonner";
 
+import { ReactGrabDev } from "@/components/custom/react-grab-dev";
 import { ThemeProvider } from "@/components/custom/theme-provider";
 
 import "./globals.css";
@@ -27,6 +28,7 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <Toaster position="top-center" richColors closeButton />
+          {process.env.NODE_ENV === "development" ? <ReactGrabDev /> : null}
           {children}
           {process.env.NODE_ENV === "development" ? (
             <Xray color="#639ee8" />

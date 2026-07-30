@@ -1,6 +1,7 @@
 allowBuilds:
   '@google/genai': true
   '@prisma/engines': true
+  agent-browser: true
   bufferutil: false
   esbuild: true
   prisma: true
@@ -8,6 +9,16 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
+minimumReleaseAgeExclude:
+  - '@ai-sdk/gateway@4.0.31'
+  - '@ai-sdk/google@4.0.27'
+  - '@ai-sdk/openai@4.0.23'
+  - '@ai-sdk/react@4.0.44'
+  - ai@7.0.41
+  - postcss@8.5.25
+
 overrides:
   '@hono/node-server': 1.19.14
-  postcss: 8.5.20
+  '@typescript-eslint/parser': 8.63.0
+  postcss: 8.5.25
+  typescript-eslint: 8.63.0

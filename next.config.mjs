@@ -7,6 +7,7 @@ const nextConfig = {
     remotePatterns: [],
   },
   turbopack: {
+    root: process.cwd(),
     rules: xrayPlugin({ bundler: "turbopack", editor: "code" }),
   },
 };

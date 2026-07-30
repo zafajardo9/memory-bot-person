@@ -22,4 +22,14 @@ if (process.env.AUTH_SECRET!.trim().length < 32) {
   process.exit(1);
 }
 
+if (
+  process.env.WEB_SEARCH_ENABLED?.toLowerCase() === "true" &&
+  !process.env.TAVILY_API_KEY?.trim()
+) {
+  console.error(
+    "TAVILY_API_KEY is required when WEB_SEARCH_ENABLED=true.",
+  );
+  process.exit(1);
+}
+
 console.log("Deployment environment is configured.");

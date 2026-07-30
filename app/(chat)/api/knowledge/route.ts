@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 
+import { getAgentForUser } from "@/db/agent-queries";
 import {
   createFileKnowledgeSource,
   createNoteKnowledgeSource,
@@ -31,12 +32,16 @@ function parseTags(value: FormDataEntryValue | null) {
     .filter(Boolean);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!isKnowledgeManagementEnabled()) return new NextResponse(null, { status: 404 });
   const user = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const agentId = new URL(request.url).searchParams.get("agentId");
+  if (!agentId || !(await getAgentForUser(agentId, user.id))) {
+    return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  }
   const [sources, usage] = await Promise.all([
-    listKnowledgeSources(),
+    listKnowledgeSources(agentId),
     getKnowledgeUsage(),
   ]);
   return NextResponse.json({ sources, usage });
@@ -53,6 +58,10 @@ export async function POST(request: Request) {
     const contentType = request.headers.get("content-type") ?? "";
     if (contentType.includes("multipart/form-data")) {
       const form = await request.formData();
+      const agentId = String(form.get("agentId") ?? "");
+      if (!(await getAgentForUser(agentId, user.id))) {
+        throw new Error("Agent not found.");
+      }
       const file = form.get("file");
       if (!(file instanceof File)) {
         return NextResponse.json({ error: "A knowledge file is required" }, { status: 400 });
@@ -69,15 +78,24 @@ export async function POST(request: Request) {
         mimeType: file.type,
         bytes,
         createdById: user.id,
+        agentId,
       });
       after(() => processKnowledgeJob(created.job.id));
       return NextResponse.json({ source: created.source, job: created.job }, { status: 202 });
     }
 
     const body = await request.json();
+    const agentId = typeof body.agentId === "string" ? body.agentId : "";
+    if (!(await getAgentForUser(agentId, user.id))) {
+      throw new Error("Agent not found.");
+    }
     if (body.type === "NOTE") {
       const parsed = createNoteKnowledgeSchema.parse(body);
-      const created = await createNoteKnowledgeSource({ ...parsed, createdById: user.id });
+      const created = await createNoteKnowledgeSource({
+        ...parsed,
+        createdById: user.id,
+        agentId,
+      });
       after(() => processKnowledgeJob(created.job.id));
       return NextResponse.json({ source: created.source, job: created.job }, { status: 202 });
     }
@@ -88,6 +106,7 @@ export async function POST(request: Request) {
       ...parsed,
       canonicalUrl: url.toString(),
       createdById: user.id,
+      agentId,
     });
     after(() => processKnowledgeJob(created.job.id));
     return NextResponse.json({ source: created.source, job: created.job }, { status: 202 });

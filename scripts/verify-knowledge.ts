@@ -17,6 +17,14 @@ async function main() {
       role: "ADMIN",
     },
   });
+  const agent = await prisma.agent.create({
+    data: {
+      userId: user.id,
+      slug: "knowledge-smoke",
+      name: "Knowledge smoke test",
+      isDefault: true,
+    },
+  });
 
   let sourceId: string | undefined;
   try {
@@ -25,6 +33,7 @@ async function main() {
       mimeType: "text/markdown",
       tags: ["smoke-test"],
       createdById: user.id,
+      agentId: agent.id,
       bytes: new TextEncoder().encode(
         "# Outline Work\nThe weekly operations report must be prepared every Friday.\n\n## Approval\nThe team lead reviews and approves the report before distribution.",
       ),
@@ -42,6 +51,7 @@ async function main() {
     const results = await searchCompanyKnowledge({
       query: "When should I prepare the operations report and who approves it?",
       userId: user.id,
+      agentId: agent.id,
       limit: 3,
     });
     if (!results.some((result) => result.content.includes("every Friday"))) {

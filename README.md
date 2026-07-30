@@ -30,6 +30,15 @@ The original weather and demonstration flight-booking tools remain available for
 - Admin-configurable Google Gemini and OpenAI connections encrypted in PostgreSQL, with environment fallbacks
 - Live model discovery limited to the chat-capable models accessible to each credential
 - Chat attachments through Vercel Blob
+- Provider-neutral web research with Tavily, direct URL citations, safe page
+  extraction, and per-user daily quotas
+- Optional read-only JavaScript-rendered page fallback through Vercel Labs
+  Agent Browser, with isolated sessions and same-domain containment
+- Private persistent user memory with conversational save/list/delete tools and
+  middleware-based recall
+- Per-user agent profiles for display name, mood, answer length, custom behavior,
+  and visual memory management at `/settings/agent`
+- Optional structured automatic memory extraction from completed turns
 - Responsive light and dark themes
 
 ## Tech stack
@@ -57,7 +66,7 @@ Knowledge text is treated as untrusted reference data, so instructions embedded 
 
 ## Prerequisites
 
-- Node.js 22.13 or newer
+- Node.js 24 or newer
 - pnpm
 - A PostgreSQL or Prisma Postgres database with pgvector support
 - A Google Gemini or OpenAI API key for chat; Gemini is used for production knowledge embeddings
@@ -84,6 +93,18 @@ KNOWLEDGE_CHAT_ENABLED=true
 KNOWLEDGE_ALLOW_LOCAL_EMBEDDINGS=false
 KNOWLEDGE_MAX_SOURCES=250
 KNOWLEDGE_MAX_CONTEXT_TOKENS=1000000
+
+WEB_SEARCH_ENABLED=false
+TAVILY_API_KEY="your-tavily-api-key"
+WEB_SEARCH_MAX_DAILY=100
+WEB_PAGE_MAX_CHARACTERS=12000
+AGENT_BROWSER_ENABLED=false
+AGENT_BROWSER_BINARY_PATH=""
+
+USER_MEMORY_ENABLED=true
+USER_MEMORY_MAX_ENTRIES=200
+USER_MEMORY_CACHE_TTL_MS=30000
+AUTO_MEMORY_ENABLED=false
 ```
 
 `POSTGRES_URL` may be a direct `postgres://`/`postgresql://` URL or a Prisma Accelerate `prisma+postgres://` URL. Direct URLs use the Prisma `pg` adapter; Accelerate URLs use the Prisma Accelerate client extension. When Accelerate is used, set `DIRECT_DATABASE_URL` to the database's direct connection string for migration commands.
@@ -94,11 +115,57 @@ Administrators may configure, test, activate, and rotate Google Gemini and OpenA
 
 Each user can choose an enabled provider and accessible model directly above the chat composer. Their selection is stored per account. Adding another provider requires one adapter in `ai/providers` and one registry entry; chat orchestration and the UI consume the shared provider contract.
 
+Each user can also tune their private agent at `/settings/agent`. The saved
+name appears in chat, while the mood, answer-length, and custom-behavior
+preferences are applied to every model response without overriding safety,
+privacy, tool-use, or company-source rules. The same page lets users inspect,
+add, and delete their own persistent memories.
+
 Set `AUTH_TRUST_HOST=true` for production only when requests pass through a trusted deployment proxy or platform, such as the intended Vercel deployment. Development automatically trusts localhost.
 
 Keep `KNOWLEDGE_ALLOW_LOCAL_EMBEDDINGS=false` in production. In non-production environments the application can fall back to deterministic local embeddings so ingestion remains testable, but Gemini embeddings provide the intended retrieval quality.
 
 `KNOWLEDGE_MAX_SOURCES` limits active workspace sources. `KNOWLEDGE_MAX_CONTEXT_TOKENS` limits the indexed tokens across ready and approved, non-archived knowledge. The Notebook shows both values as live capacity; archiving or deleting a source releases its allocation.
+
+Set `WEB_SEARCH_ENABLED=true` and configure `TAVILY_API_KEY` to expose
+`webSearch` and `readWebPage`. Search usage is limited per user and UTC day by
+`WEB_SEARCH_MAX_DAILY`; page text returned to the model is capped by
+`WEB_PAGE_MAX_CHARACTERS`. Public page reads reuse the knowledge system's DNS,
+redirect, port, timeout, and response-size protections.
+
+Web research is consent-gated per turn. The assistant starts with the approved
+Notebook and asks before using public-web sources unless the user directly
+requested web research. After approval, the final response separates Notebook
+findings, current web findings, and a cited comparison of agreements, additions,
+gaps, and conflicts.
+
+Agent Browser is a secondary reader for public pages that require JavaScript
+rendering. It is never exposed as an unrestricted automation shell: chat can
+only provide a public URL, open it in a fresh isolated headless session, extract
+readable content, and close the session. Each request reuses the existing web
+quota and applies public-URL validation, domain containment, content boundary
+markers, and output limits. It cannot click, type, upload, reuse browser
+profiles, authenticate, or execute arbitrary JavaScript.
+
+Install its pinned native CLI and Chrome-for-Testing runtime once:
+
+```bash
+pnpm install
+pnpm agent-browser:install
+pnpm agent-browser:doctor
+```
+
+Local development enables the integration automatically when the native binary
+is present. Production requires `AGENT_BROWSER_ENABLED=true`. Standard Vercel
+serverless functions are not a suitable host for the long-lived Chrome child
+process; use a container or persistent compute service and optionally set
+`AGENT_BROWSER_BINARY_PATH` when the binary is managed outside `node_modules`.
+
+`USER_MEMORY_ENABLED` exposes private, user-scoped save, list, and delete tools
+and injects the top memories before every model step. `AUTO_MEMORY_ENABLED` is
+intentionally opt-in because it adds a structured model call after each
+completed chat turn. Automatic extraction stores only high-confidence,
+non-sensitive durable context. `USER_MEMORY_MAX_ENTRIES` defaults to 200.
 
 Never commit `.env.local`. Generate an Auth.js secret with `openssl rand -base64 32`.
 
@@ -162,6 +229,8 @@ To publish knowledge:
 | `pnpm lint` | Run ESLint 9 with the flat project configuration. |
 | `pnpm typecheck` | Run TypeScript without emitting files. |
 | `pnpm test` | Run the Vitest suite. |
+| `pnpm agent-browser:install` | Download Agent Browser's Chrome-for-Testing runtime. |
+| `pnpm agent-browser:doctor` | Verify the Agent Browser CLI, Chrome, and launch environment. |
 | `pnpm db:generate` | Generate Prisma Client. |
 | `pnpm db:migrate` | Create/apply a development migration. |
 | `pnpm db:deploy` | Apply checked-in migrations. |
@@ -177,19 +246,27 @@ app/
   (chat)/api/knowledge/    Knowledge management and job APIs
   (chat)/api/ai/           Provider configuration, model discovery, and user selection
   (chat)/api/chat/         Thin streaming chat endpoint
+  (chat)/settings/agent/   Per-user agent and memory settings
 ai/
   chat/                    Provider-neutral streaming orchestration
   providers/               Provider adapters, registry, credentials, and model catalog
-  tools/                   Weather, flight, and knowledge tool composition
+  memory/                  Structured automatic memory extraction
+  tools/                   Knowledge, web, browser, memory, weather, and flight tools
   knowledge-tools.ts       Search/read/list tool definitions
   prompts/                 Source-first company assistant contract
 components/
   knowledge/               Shared notebook and citation interfaces
+  settings/                Agent and provider settings interfaces
 db/
+  agent-settings-queries.ts Per-user agent profile persistence
   queries.ts               Prisma user/chat/reservation persistence
   knowledge-queries.ts     Knowledge lifecycle persistence
+  memory-queries.ts        User-scoped memory persistence
 lib/
   knowledge/               Extraction, security, chunking, embeddings, retrieval
+  memory/                  Feature flags, cache, and prompt preflight
+  agent-settings.ts        Agent profile validation, defaults, and prompt formatting
+  web/                     Tavily registry, quota, and safe page extraction
   prisma.ts                Direct PostgreSQL and Accelerate client selection
 prisma/
   schema.prisma            Complete application and knowledge data model
@@ -223,6 +300,10 @@ All routes require authentication. Members may list and contribute sources and m
 - `KnowledgeIngestionJob` records progress, retries, stages, and errors.
 - `KnowledgeAuditEvent` records source-of-truth changes.
 - `KnowledgeQueryLog` stores minimal retrieval telemetry and selected chunk IDs.
+- `UserMemory` stores private durable context and is deleted with its owning
+  user.
+- `UserAgentSettings` stores one optional private response profile per user.
+- `WebSearchUsage` enforces the per-user UTC-day search allowance.
 
 Original knowledge files are stored privately in PostgreSQL rather than exposed through public Blob URLs. Ordinary chat attachments continue to use Vercel Blob.
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, MessageSquareText } from "lucide-react";
+import { BookOpen, Bot, MessageSquareText, Wrench } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,6 +12,8 @@ export function NavigationLinks({
   const pathname = usePathname();
   const notebookActive = pathname.startsWith("/knowledge");
   const chatActive = pathname === "/" || pathname.startsWith("/chat/");
+  const agentActive = pathname.startsWith("/agents");
+  const toolsActive = pathname === "/tools";
 
   return (
     <nav className="flex items-center gap-1" aria-label="Workspace navigation">
@@ -42,6 +44,32 @@ export function NavigationLinks({
           <span>Notebook</span>
         </Link>
       ) : null}
+      <Link
+        href="/agents"
+        aria-current={agentActive ? "page" : undefined}
+        aria-label="Agent workspace"
+        className={`hidden h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors xl:flex ${
+          agentActive
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+        }`}
+      >
+        <Bot size={15} />
+        Agents
+      </Link>
+      <Link
+        href="/tools"
+        aria-current={toolsActive ? "page" : undefined}
+        aria-label="Tool integrations"
+        className={`hidden h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors xl:flex ${
+          toolsActive
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+        }`}
+      >
+        <Wrench size={15} />
+        Tools
+      </Link>
     </nav>
   );
 }

@@ -19,7 +19,7 @@ function encryptionKey() {
   return createHash("sha256").update(secret).digest();
 }
 
-export function encryptProviderSecret(value: string) {
+export function encryptSecret(value: string) {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
   const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
@@ -32,7 +32,7 @@ export function encryptProviderSecret(value: string) {
   ].join(":");
 }
 
-export function decryptProviderSecret(payload: string) {
+export function decryptSecret(payload: string) {
   const [version, ivValue, tagValue, encryptedValue] = payload.split(":");
   if (
     version !== ENCRYPTION_VERSION ||
@@ -53,3 +53,6 @@ export function decryptProviderSecret(payload: string) {
     decipher.final(),
   ]).toString("utf8");
 }
+
+export const encryptProviderSecret = encryptSecret;
+export const decryptProviderSecret = decryptSecret;

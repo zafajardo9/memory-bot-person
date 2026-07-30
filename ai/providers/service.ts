@@ -213,6 +213,7 @@ function modelInCatalog(
 export async function getAIProviderCatalog(
   userId: string,
   canConfigure: boolean,
+  agentId?: string,
 ): Promise<AIProviderCatalog> {
   const statuses = await listProviderStatuses();
   const providers = await Promise.all(
@@ -241,10 +242,20 @@ export async function getAIProviderCatalog(
       }),
   );
 
+  const agent = agentId
+    ? await prisma.agent.findFirst({
+        where: { id: agentId, userId },
+        select: { providerId: true, modelId: true },
+      })
+    : null;
+  if (agentId && !agent) throw new Error("Agent not found.");
   const stored = await prisma.userAiSelection.findUnique({ where: { userId } });
   let selection = stored
     ? { providerId: stored.providerId, modelId: stored.modelId }
-    : null;
+      : null;
+  if (agent?.providerId && agent.modelId) {
+    selection = { providerId: agent.providerId, modelId: agent.modelId };
+  }
 
   if (!selection || !modelInCatalog(providers, selection)) {
     const firstProvider = providers.find((provider) => provider.models.length > 0);
@@ -259,6 +270,12 @@ export async function getAIProviderCatalog(
         create: { userId, ...selection },
         update: selection,
       });
+      if (agentId) {
+        await prisma.agent.update({
+          where: { id: agentId },
+          data: selection,
+        });
+      }
     } else {
       selection = null;
     }
@@ -267,7 +284,11 @@ export async function getAIProviderCatalog(
   return { providers, selection, canConfigure };
 }
 
-export async function saveUserAISelection(userId: string, selection: AISelection) {
+export async function saveUserAISelection(
+  userId: string,
+  selection: AISelection,
+  agentId?: string,
+) {
   if (!isAIProviderId(selection.providerId)) {
     throw new Error("Unsupported AI provider.");
   }
@@ -281,16 +302,24 @@ export async function saveUserAISelection(userId: string, selection: AISelection
   if (!models.some((model) => model.id === selection.modelId)) {
     throw new Error("The selected model is not accessible to this provider key.");
   }
-  await prisma.userAiSelection.upsert({
-    where: { userId },
-    create: { userId, ...selection },
-    update: selection,
-  });
+  if (agentId) {
+    const updated = await prisma.agent.updateMany({
+      where: { id: agentId, userId },
+      data: selection,
+    });
+    if (updated.count === 0) throw new Error("Agent not found.");
+  } else {
+    await prisma.userAiSelection.upsert({
+      where: { userId },
+      create: { userId, ...selection },
+      update: selection,
+    });
+  }
   return selection;
 }
 
-export async function resolveUserLanguageModel(userId: string) {
-  const catalog = await getAIProviderCatalog(userId, false);
+export async function resolveUserLanguageModel(userId: string, agentId?: string) {
+  const catalog = await getAIProviderCatalog(userId, false, agentId);
   if (!catalog.selection) {
     throw new Error(
       "No AI provider is available. An administrator must configure and enable one.",

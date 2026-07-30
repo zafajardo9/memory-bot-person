@@ -3,11 +3,13 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
+import { isImageKitConfigured, uploadKnowledgeFile } from "@/lib/storage/imagekit";
 
 import type { Prisma } from "@/lib/generated/prisma/client";
 
-export function listKnowledgeSources() {
+export function listKnowledgeSources(agentId?: string) {
   return prisma.knowledgeSource.findMany({
+    where: agentId ? { agents: { some: { agentId } } } : undefined,
     orderBy: { updatedAt: "desc" },
     include: {
       createdBy: { select: { id: true, email: true } },
@@ -46,6 +48,7 @@ export async function createNoteKnowledgeSource(input: {
   content: string;
   tags: string[];
   createdById: string;
+  agentId: string;
 }) {
   return createFileKnowledgeSource({
     title: input.title,
@@ -53,6 +56,7 @@ export async function createNoteKnowledgeSource(input: {
     bytes: new TextEncoder().encode(input.content),
     tags: input.tags,
     createdById: input.createdById,
+    agentId: input.agentId,
     type: "NOTE",
   });
 }
@@ -77,8 +81,29 @@ export async function createFileKnowledgeSource(input: {
   bytes: Uint8Array;
   tags: string[];
   createdById: string;
+  agentId: string;
   type?: "FILE" | "NOTE";
 }) {
+  // Upload to ImageKit if configured, otherwise store bytes in the database.
+  let storageProvider: string | null = null;
+  let storageRef: string | null = null;
+  let originalContent: Uint8Array | null = input.bytes;
+
+  if (isImageKitConfigured()) {
+    try {
+      const result = await uploadKnowledgeFile(
+        input.title,
+        input.bytes,
+        input.mimeType,
+      );
+      storageProvider = "imagekit";
+      storageRef = result.fileId;
+      originalContent = null;
+    } catch (error) {
+      console.error("ImageKit upload failed, falling back to database storage:", error);
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const source = await tx.knowledgeSource.create({
       data: {
@@ -89,12 +114,17 @@ export async function createFileKnowledgeSource(input: {
         createdById: input.createdById,
       },
     });
+    await tx.agentKnowledgeSource.create({
+      data: { agentId: input.agentId, sourceId: source.id },
+    });
     const version = await tx.knowledgeSourceVersion.create({
       data: {
         sourceId: source.id,
         version: 1,
         checksum: `pending-${randomUUID()}`,
-        originalContent: input.bytes as Uint8Array<ArrayBuffer>,
+        originalContent: originalContent as Uint8Array<ArrayBuffer> | null,
+        storageProvider,
+        storageRef,
       },
     });
     const job = await tx.knowledgeIngestionJob.create({
@@ -123,6 +153,7 @@ export async function createUrlKnowledgeSource(input: {
   crawlDepth: number;
   crawlLimit: number;
   createdById: string;
+  agentId: string;
 }) {
   return prisma.$transaction(async (tx) => {
     const source = await tx.knowledgeSource.create({
@@ -135,6 +166,9 @@ export async function createUrlKnowledgeSource(input: {
         crawlLimit: input.crawlLimit,
         createdById: input.createdById,
       },
+    });
+    await tx.agentKnowledgeSource.create({
+      data: { agentId: input.agentId, sourceId: source.id },
     });
     const version = await tx.knowledgeSourceVersion.create({
       data: {
@@ -167,6 +201,30 @@ export async function createRescanJob(
   actorId: string,
   replacement?: { bytes: Uint8Array; mimeType: string },
 ) {
+  // Resolve storage for the new version before opening the transaction.
+  let storageProvider: string | null = null;
+  let storageRef: string | null = null;
+  let originalContent: Uint8Array | null = null;
+
+  if (replacement && isImageKitConfigured()) {
+    try {
+      const source = await prisma.knowledgeSource.findUnique({
+        where: { id: sourceId },
+        select: { title: true },
+      });
+      const result = await uploadKnowledgeFile(
+        source?.title ?? "rescanned-file",
+        replacement.bytes,
+        replacement.mimeType,
+      );
+      storageProvider = "imagekit";
+      storageRef = result.fileId;
+    } catch (error) {
+      console.error("ImageKit upload failed for rescan, falling back to database:", error);
+      originalContent = replacement.bytes;
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const source = await tx.knowledgeSource.findUnique({
       where: { id: sourceId },
@@ -176,17 +234,27 @@ export async function createRescanJob(
     if (source.status === "ARCHIVED") throw new Error("Archived sources cannot be rescanned");
 
     const latest = source.versions[0];
+
+    // Carry forward the database bytes when no replacement is provided.
+    if (!replacement && !storageProvider) {
+      originalContent = latest?.originalContent ?? null;
+    }
+
+    // Carry forward ImageKit reference when re-scanning without replacement.
+    if (!replacement && !storageProvider && latest?.storageProvider === "imagekit" && latest?.storageRef) {
+      storageProvider = latest.storageProvider;
+      storageRef = latest.storageRef;
+    }
+
     const nextVersion = (latest?.version ?? 0) + 1;
     const version = await tx.knowledgeSourceVersion.create({
       data: {
         sourceId,
         version: nextVersion,
         checksum: `pending-${randomUUID()}`,
-        originalContent:
-          source.type === "FILE" || source.type === "NOTE"
-            ? ((replacement?.bytes as Uint8Array<ArrayBuffer> | undefined) ??
-              latest?.originalContent)
-            : undefined,
+        originalContent: originalContent as Uint8Array<ArrayBuffer> | null,
+        storageProvider,
+        storageRef,
       },
     });
     const job = await tx.knowledgeIngestionJob.create({

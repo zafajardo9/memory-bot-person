@@ -1,132 +1,146 @@
 "use client";
 
 import {
-  getToolName,
   isFileUIPart,
+  isReasoningUIPart,
   isTextUIPart,
   isToolUIPart,
   type UIMessage,
 } from "ai";
-import { motion } from "framer-motion";
-import { Streamdown } from "streamdown";
+import { Paperclip } from "lucide-react";
 
+import { AssistantActivity } from "./assistant-activity";
+import { ChatMarkdown } from "./chat-markdown";
+import { FollowUpQuestions } from "./follow-up-questions";
 import { BotIcon, UserIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
-import { Weather } from "./weather";
-import { AuthorizePayment } from "../flights/authorize-payment";
-import { DisplayBoardingPass } from "../flights/boarding-pass";
-import { CreateReservation } from "../flights/create-reservation";
-import { FlightStatus } from "../flights/flight-status";
-import { ListFlights } from "../flights/list-flights";
-import { SelectSeats } from "../flights/select-seats";
-import { VerifyPayment } from "../flights/verify-payment";
-import { KnowledgeResults } from "../knowledge/knowledge-results";
 
 export const Message = ({
   chatId,
   message,
+  agentName,
+  isActive = false,
+  onSelectFollowUp,
+  showFollowUps = false,
+  userMessage,
 }: {
   chatId: string;
   message: UIMessage;
+  agentName: string;
+  isActive?: boolean;
+  onSelectFollowUp: (question: string) => Promise<void>;
+  showFollowUps?: boolean;
+  userMessage: string;
 }) => {
   const { role } = message;
   const content = message.parts
     .filter(isTextUIPart)
     .map((part) => part.text)
     .join("");
+  const reasoning = message.parts.filter(isReasoningUIPart);
   const toolInvocations = message.parts.filter(isToolUIPart);
   const attachments = message.parts.filter(isFileUIPart);
+  const sources = message.parts.filter((part) => part.type === "source-url");
+  const isAssistant = role === "assistant";
+  const showAnswer = isAssistant && Boolean(content);
 
   return (
-    <motion.div
+    <article
       className="flex w-full max-w-3xl flex-row gap-3 px-4 first-of-type:pt-24 sm:gap-4 sm:px-0"
-      initial={{ y: 5, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
     >
-      <div className={`flex size-8 shrink-0 flex-col items-center justify-center rounded-md border p-1 ${role === "assistant" ? "border-primary/25 bg-primary/8 text-primary" : "bg-card text-muted-foreground"}`}>
-        {role === "assistant" ? <BotIcon /> : <UserIcon />}
+      <div
+        className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
+          isAssistant
+            ? "text-primary"
+            : "text-muted-foreground"
+        }`}
+      >
+        {isAssistant ? <BotIcon /> : <UserIcon />}
       </div>
 
-      <div className="flex flex-col gap-2 w-full">
-        {content && (
-          <div className={`flex flex-col gap-4 leading-7 ${role === "user" ? "rounded-xl border bg-muted px-4 py-2.5 text-foreground" : "text-foreground"}`}>
-            <Streamdown>{content}</Streamdown>
+      <div className="flex min-w-0 w-full flex-col gap-3">
+        {isAssistant ? (
+          <div className="-mb-1 text-xs font-semibold text-foreground">
+            {agentName}
           </div>
-        )}
-
-        {toolInvocations.length > 0 && (
-          <div className="flex flex-col gap-4">
-            {toolInvocations.map((toolInvocation) => {
-              const toolName = getToolName(toolInvocation);
-              const { toolCallId, state } = toolInvocation;
-
-              if (state === "output-available") {
-                const result = toolInvocation.output;
-
-                return (
-                  <div key={toolCallId}>
-                    {toolName === "getWeather" ? (
-                      <Weather weatherAtLocation={result as never} />
-                    ) : toolName === "displayFlightStatus" ? (
-                      <FlightStatus flightStatus={result as never} />
-                    ) : toolName === "searchFlights" ? (
-                      <ListFlights chatId={chatId} results={result as never} />
-                    ) : toolName === "selectSeats" ? (
-                      <SelectSeats chatId={chatId} availability={result as never} />
-                    ) : toolName === "createReservation" ? (
-                      typeof result === "object" && result !== null && "error" in result ? null : (
-                        <CreateReservation reservation={result as never} />
-                      )
-                    ) : toolName === "authorizePayment" ? (
-                      <AuthorizePayment intent={result as never} />
-                    ) : toolName === "displayBoardingPass" ? (
-                      <DisplayBoardingPass boardingPass={result as never} />
-                    ) : toolName === "verifyPayment" ? (
-                      <VerifyPayment result={result as never} />
-                    ) : toolName === "searchCompanyKnowledge" ||
-                      toolName === "readCompanyKnowledge" ? (
-                      <KnowledgeResults result={result as never} />
-                    ) : (
-                      <div>{JSON.stringify(result, null, 2)}</div>
-                    )}
-                  </div>
-                );
-              } else {
-                return (
-                  <div key={toolCallId} className="skeleton">
-                    {toolName === "getWeather" ? (
-                      <Weather />
-                    ) : toolName === "displayFlightStatus" ? (
-                      <FlightStatus />
-                    ) : toolName === "searchFlights" ? (
-                      <ListFlights chatId={chatId} />
-                    ) : toolName === "selectSeats" ? (
-                      <SelectSeats chatId={chatId} />
-                    ) : toolName === "createReservation" ? (
-                      <CreateReservation />
-                    ) : toolName === "authorizePayment" ? (
-                      <AuthorizePayment />
-                    ) : toolName === "displayBoardingPass" ? (
-                      <DisplayBoardingPass />
-                    ) : toolName === "searchCompanyKnowledge" ||
-                      toolName === "readCompanyKnowledge" ? (
-                      <KnowledgeResults />
-                    ) : null}
-                  </div>
-                );
-              }
-            })}
+        ) : null}
+        {!isAssistant && attachments.length > 0 ? (
+          <div className="rounded-xl border bg-muted/45 p-2.5">
+            <div className="mb-2 flex items-center gap-1.5 px-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <Paperclip size={11} />
+              {attachments.length === 1 ? "File shared" : "Files shared"}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((attachment) => (
+                <PreviewAttachment
+                  key={attachment.url}
+                  attachment={attachment}
+                />
+              ))}
+            </div>
           </div>
-        )}
+        ) : null}
 
-        {attachments.length > 0 && (
-          <div className="flex flex-row gap-2">
+        {!isAssistant && content ? (
+          <div className="relative flex flex-col gap-3 rounded-xl border bg-muted px-4 py-2.5 leading-6 text-foreground before:absolute before:left-[-5px] before:top-[14px] before:size-2 before:rotate-45 before:border-b before:border-l before:border-border before:bg-muted">
+            <ChatMarkdown>{content}</ChatMarkdown>
+          </div>
+        ) : null}
+
+        {isAssistant ? (
+          <AssistantActivity
+            chatId={chatId}
+            reasoning={reasoning}
+            tools={toolInvocations}
+            sources={sources}
+            isActive={isActive}
+          />
+        ) : null}
+
+        {showAnswer ? (
+          <section
+            aria-label="Assistant answer"
+            className={
+              reasoning.length > 0 ||
+              toolInvocations.length > 0 ||
+              sources.length > 0
+                ? "border-t pt-3"
+                : ""
+            }
+          >
+            {reasoning.length > 0 ||
+            toolInvocations.length > 0 ||
+            sources.length > 0 ? (
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Answer
+              </div>
+            ) : null}
+            <div className="min-w-0 text-foreground">
+              <ChatMarkdown streaming={isActive}>{content}</ChatMarkdown>
+            </div>
+          </section>
+        ) : null}
+
+        {isAssistant && attachments.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
             {attachments.map((attachment) => (
-              <PreviewAttachment key={attachment.url} attachment={attachment} />
+              <PreviewAttachment
+                key={attachment.url}
+                attachment={attachment}
+              />
             ))}
           </div>
-        )}
+        ) : null}
+
+        {showFollowUps && content ? (
+          <FollowUpQuestions
+            assistantMessage={content}
+            messageId={message.id}
+            userMessage={userMessage}
+            onSelect={onSelectFollowUp}
+          />
+        ) : null}
       </div>
-    </motion.div>
+    </article>
   );
 };
