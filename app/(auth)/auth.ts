@@ -7,7 +7,7 @@ import { getUser } from "@/db/queries";
 import { authConfig } from "./auth.config";
 
 interface ExtendedSession extends Session {
-  user: User & { id: string; role: "MEMBER" | "ADMIN" };
+  user: User & { id: string; role: "MEMBER" | "ADMIN"; name?: string | null };
 }
 
 export const {
@@ -33,6 +33,7 @@ export const {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
+        token.name = (user as any).name ?? null;
       }
 
       return token;
@@ -47,6 +48,7 @@ export const {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as "MEMBER" | "ADMIN";
+        session.user.name = (token.name as string) ?? null;
       }
 
       return session;

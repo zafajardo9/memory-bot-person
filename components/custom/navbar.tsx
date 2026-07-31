@@ -7,6 +7,7 @@ import {
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
+  User as UserIcon,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
@@ -55,7 +56,7 @@ export function NavigationBar({
   signOutAction: () => Promise<void>;
 }) {
   const email = user?.email ?? "";
-  const accountName = email.split("@")[0] || "Account";
+  const accountName = user?.name || email.split("@")[0] || "Account";
   const initial = accountName.charAt(0).toUpperCase();
 
   return (
@@ -182,6 +183,12 @@ export function NavigationBar({
                 </DropdownMenuItem>
               ) : null}
 
+              <DropdownMenuItem asChild className="h-10 gap-3 rounded-lg">
+                <Link href="/account">
+                  <UserIcon size={15} className="text-muted-foreground" />
+                  Account settings
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild className="h-10 rounded-lg p-0">
                 <ThemeToggle className="h-10 px-2" />
