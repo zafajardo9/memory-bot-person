@@ -10,7 +10,7 @@ import { createMemoryMiddleware } from "@/ai/custom-middleware";
 import { companyAssistantSystemPrompt } from "@/ai/prompts/company-assistant";
 import { resolveUserLanguageModel } from "@/ai/providers/service";
 import { createChatTools } from "@/ai/tools";
-import { getAgentForUser } from "@/db/agent-queries";
+import { getAgentForUserDetailed } from "@/db/agent-queries";
 import { formatAgentSettingsForPrompt } from "@/lib/agent-settings";
 import { agentSettingsFromProfile, toolEnabled } from "@/lib/agents";
 import { isKnowledgeChatEnabled } from "@/lib/knowledge/config";
@@ -71,7 +71,7 @@ export async function streamCompanyChat(input: {
 }) {
   const userText = latestUserText(input.messages);
   const webAccessApproved = hasWebResearchConsent(input.messages);
-  const agent = await getAgentForUser(input.agentId, input.userId);
+  const agent = await getAgentForUserDetailed(input.agentId, input.userId);
   if (!agent) throw new Error("Agent not found.");
   const [selected] = await Promise.all([
     resolveUserLanguageModel(input.userId, input.agentId),

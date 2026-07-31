@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
 import { AgentSettingsPanel } from "@/components/settings/agent-settings";
-import { getAgentForUser } from "@/db/agent-queries";
+import { getAgentForUserDetailed } from "@/db/agent-queries";
 import { queryUserMemories } from "@/db/memory-queries";
 import { agentSettingsFromProfile } from "@/lib/agents";
 
@@ -14,7 +14,7 @@ export default async function AgentSettingsPage({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const { agentId } = await params;
-  const agent = await getAgentForUser(agentId, session.user.id);
+  const agent = await getAgentForUserDetailed(agentId, session.user.id);
   if (!agent) notFound();
   const memories = await queryUserMemories({
     userId: session.user.id,

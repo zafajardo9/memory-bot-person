@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/app/(auth)/auth";
 import { Chat as PreviewChat } from "@/components/custom/chat";
-import { getAgentForUser } from "@/db/agent-queries";
+import { getAgentForUserDetailed } from "@/db/agent-queries";
 import { getChatById } from "@/db/queries";
 import { convertToUIMessages } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     return notFound();
   }
 
-  const agent = await getAgentForUser(chat.agentId, session.user.id);
+  const agent = await getAgentForUserDetailed(chat.agentId, session.user.id);
   if (!agent) return notFound();
   return (
     <PreviewChat

@@ -79,6 +79,13 @@ export async function listAgents(userId: string) {
 export async function getAgentForUser(agentId: string, userId: string) {
   return prisma.agent.findFirst({
     where: { id: agentId, userId },
+    select: { id: true },
+  });
+}
+
+export async function getAgentForUserDetailed(agentId: string, userId: string) {
+  return prisma.agent.findFirst({
+    where: { id: agentId, userId },
     include: {
       _count: {
         select: { chats: true, memories: true, knowledgeSources: true },
@@ -119,7 +126,7 @@ export async function updateAgent(
   userId: string,
   input: UpdateAgentInput,
 ) {
-  const existing = await getAgentForUser(agentId, userId);
+  const existing = await getAgentForUserDetailed(agentId, userId);
   if (!existing) throw new Error("Agent not found.");
   const values = updateAgentSchema.parse(input);
   return prisma.agent.update({
@@ -142,7 +149,7 @@ export async function updateAgent(
 }
 
 export async function setDefaultAgent(agentId: string, userId: string) {
-  const agent = await getAgentForUser(agentId, userId);
+  const agent = await getAgentForUserDetailed(agentId, userId);
   if (!agent) throw new Error("Agent not found.");
   await prisma.$transaction([
     prisma.agent.updateMany({
@@ -154,11 +161,11 @@ export async function setDefaultAgent(agentId: string, userId: string) {
       data: { isDefault: true },
     }),
   ]);
-  return getAgentForUser(agentId, userId);
+  return getAgentForUserDetailed(agentId, userId);
 }
 
 export async function deleteAgent(agentId: string, userId: string) {
-  const agent = await getAgentForUser(agentId, userId);
+  const agent = await getAgentForUserDetailed(agentId, userId);
   if (!agent) throw new Error("Agent not found.");
   if (agent.isDefault) {
     throw new Error("Choose another default agent before deleting this one.");

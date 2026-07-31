@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   deleteAgent,
-  getAgentForUser,
+  getAgentForUserDetailed,
   setDefaultAgent,
   updateAgent,
 } from "@/db/agent-queries";
@@ -16,7 +16,7 @@ export async function GET(
   const user = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const agent = await getAgentForUser(id, user.id);
+  const agent = await getAgentForUserDetailed(id, user.id);
   if (!agent) return NextResponse.json({ error: "Agent not found." }, { status: 404 });
   return NextResponse.json({ agent });
 }

@@ -1,0 +1,15 @@
+{
+  "framework": "nextjs",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm db:deploy && pnpm build",
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  },
+  "functions": {
+    "app/(chat)/api/**/*.ts": {
+      "maxDuration": 300
+    }
+  }
+}

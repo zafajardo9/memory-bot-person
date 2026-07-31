@@ -36,15 +36,24 @@ export async function GET(request: Request) {
   if (!isKnowledgeManagementEnabled()) return new NextResponse(null, { status: 404 });
   const user = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const agentId = new URL(request.url).searchParams.get("agentId");
-  if (!agentId || !(await getAgentForUser(agentId, user.id))) {
-    return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+
+  try {
+    const agentId = new URL(request.url).searchParams.get("agentId");
+    if (!agentId || !(await getAgentForUser(agentId, user.id))) {
+      return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+    }
+    const [sources, usage] = await Promise.all([
+      listKnowledgeSources(agentId),
+      getKnowledgeUsage(),
+    ]);
+    return NextResponse.json({ sources, usage });
+  } catch (error) {
+    console.error("Failed to list knowledge sources:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to load knowledge sources." },
+      { status: 500 },
+    );
   }
-  const [sources, usage] = await Promise.all([
-    listKnowledgeSources(agentId),
-    getKnowledgeUsage(),
-  ]);
-  return NextResponse.json({ sources, usage });
 }
 
 export async function POST(request: Request) {
