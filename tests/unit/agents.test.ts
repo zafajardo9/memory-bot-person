@@ -48,6 +48,7 @@ describe("agent profiles", () => {
       mood: "analytical",
       responseLength: "detailed",
       customInstructions: "Separate assumptions from facts.",
+      responseLayers: [],
     });
   });
 });

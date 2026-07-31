@@ -216,6 +216,17 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
                       <Settings2 size={15} />
                     </Link>
                   </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="icon"
+                    className="rounded-xl"
+                    aria-label={`Open ${agent.name} knowledge`}
+                  >
+                    <Link href={`/agents/${agent.id}/knowledge`}>
+                      <BookOpen size={15} />
+                    </Link>
+                  </Button>
                   {!agent.isDefault ? (
                     <Button
                       variant="ghost"
@@ -235,7 +246,7 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="rounded-2xl sm:max-w-lg">
+        <DialogContent className="rounded-2xl p-6 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Create a focused agent</DialogTitle>
             <DialogDescription>
@@ -243,7 +254,7 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
               voice, and model independently afterward.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="new-agent-name">Name</Label>
               <Input
@@ -292,7 +303,7 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
               ))}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-2">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
@@ -307,7 +318,7 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
       </Dialog>
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={() => setDeleteTarget(null)}>
-        <DialogContent className="rounded-2xl sm:max-w-md">
+        <DialogContent className="rounded-2xl p-6 sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
             <DialogDescription>

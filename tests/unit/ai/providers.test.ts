@@ -16,6 +16,7 @@ describe("AI provider registry", () => {
       "deepseek",
       "mistral",
       "groq",
+      "zhipu",
     ]);
     expect(getAIProviderAdapter("google").environmentKey).toBe(
       "GOOGLE_GENERATIVE_AI_API_KEY",

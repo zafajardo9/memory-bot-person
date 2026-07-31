@@ -210,55 +210,61 @@ export async function processKnowledgeJob(jobId: string) {
       }
     }
 
-    await prisma.$transaction([
-      prisma.knowledgeSourceVersion.update({
-        where: { id: job.versionId },
-        data: {
-          checksum,
-          status: "READY",
-          extractedText,
-          metadata: asJson(document.metadata ?? {}),
-          embeddingModel: KNOWLEDGE_EMBEDDING_MODEL,
-        },
-      }),
-      prisma.knowledgeIngestionJob.update({
-        where: { id: jobId },
-        data: {
-          status: "COMPLETED",
-          stage: "ready_for_approval",
-          progress: 100,
-          completedAt: new Date(),
-        },
-      }),
-      prisma.knowledgeSource.update({
-        where: { id: job.sourceId },
-        data: {
-          status: job.source.currentVersionId ? "APPROVED" : "DRAFT",
-          lastIndexedAt: new Date(),
-        },
-      }),
-    ]);
+    await prisma.$transaction(
+      [
+        prisma.knowledgeSourceVersion.update({
+          where: { id: job.versionId },
+          data: {
+            checksum,
+            status: "READY",
+            extractedText,
+            metadata: asJson(document.metadata ?? {}),
+            embeddingModel: KNOWLEDGE_EMBEDDING_MODEL,
+          },
+        }),
+        prisma.knowledgeIngestionJob.update({
+          where: { id: jobId },
+          data: {
+            status: "COMPLETED",
+            stage: "ready_for_approval",
+            progress: 100,
+            completedAt: new Date(),
+          },
+        }),
+        prisma.knowledgeSource.update({
+          where: { id: job.sourceId },
+          data: {
+            status: job.source.currentVersionId ? "APPROVED" : "DRAFT",
+            lastIndexedAt: new Date(),
+          },
+        }),
+      ],
+      { timeout: 30_000 },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Knowledge ingestion failed";
-    await prisma.$transaction([
-      prisma.knowledgeIngestionJob.update({
-        where: { id: jobId },
-        data: {
-          status: "FAILED",
-          stage: "failed",
-          errorMessage: message,
-          completedAt: new Date(),
-        },
-      }),
-      prisma.knowledgeSourceVersion.update({
-        where: { id: job.versionId },
-        data: { status: "FAILED", errorMessage: message },
-      }),
-      prisma.knowledgeSource.update({
-        where: { id: job.sourceId },
-        data: { status: job.source.currentVersionId ? "APPROVED" : "FAILED" },
-      }),
-    ]);
+    await prisma.$transaction(
+      [
+        prisma.knowledgeIngestionJob.update({
+          where: { id: jobId },
+          data: {
+            status: "FAILED",
+            stage: "failed",
+            errorMessage: message,
+            completedAt: new Date(),
+          },
+        }),
+        prisma.knowledgeSourceVersion.update({
+          where: { id: job.versionId },
+          data: { status: "FAILED", errorMessage: message },
+        }),
+        prisma.knowledgeSource.update({
+          where: { id: job.sourceId },
+          data: { status: job.source.currentVersionId ? "APPROVED" : "FAILED" },
+        }),
+      ],
+      { timeout: 30_000 },
+    );
     console.error("Knowledge ingestion failed", { jobId, error: message });
   }
 }

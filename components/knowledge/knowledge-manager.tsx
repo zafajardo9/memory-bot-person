@@ -6,6 +6,7 @@ import {
   Bold,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
   Code2,
   Database,
   FileText,
@@ -21,6 +22,7 @@ import {
   Plus,
   Quote,
   Redo2,
+  RefreshCw,
   Search,
   ShieldCheck,
   Trash2,
@@ -28,7 +30,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
 import TurndownService from "turndown";
@@ -134,10 +136,11 @@ export function KnowledgeManager({
   agentId: string;
   agentName: string;
 }) {
+  const [activeAgentId, setActiveAgentId] = useState(agentId);
   const { data, error, isLoading, mutate } = useSWR<{
     sources: SourceSummary[];
     usage: KnowledgeUsage;
-  }>(`/api/knowledge?agentId=${encodeURIComponent(agentId)}`, fetcher, {
+  }>(`/api/knowledge?agentId=${encodeURIComponent(activeAgentId)}`, fetcher, {
     refreshInterval: 3_000,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -150,6 +153,28 @@ export function KnowledgeManager({
   const turndown = useRef(
     new TurndownService({ headingStyle: "atx", bulletListMarker: "-" }),
   );
+
+  const { data: agentsData } = useSWR<{
+    agents: Array<{
+      id: string;
+      name: string;
+      color: string;
+      description: string;
+      avatar: string;
+    }>;
+  }>("/api/agents", fetcher);
+  const agents = agentsData?.agents ?? [];
+  const activeAgent = agents.find((a) => a.id === activeAgentId);
+  const [agentPickerOpen, setAgentPickerOpen] = useState(false);
+
+  const agentColorStyles: Record<string, string> = {
+    violet: "border-violet-500/25 bg-violet-500/10 text-violet-600 dark:text-violet-300",
+    blue: "border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-300",
+    emerald: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+    amber: "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    rose: "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-300",
+    slate: "border-slate-500/25 bg-slate-500/10 text-slate-600 dark:text-slate-300",
+  };
 
   const sources = useMemo(() => data?.sources ?? [], [data?.sources]);
   const usage = data?.usage;
@@ -209,7 +234,7 @@ export function KnowledgeManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "NOTE",
-          agentId,
+          activeAgentId,
           title: form.get("title"),
           content,
           tags: String(form.get("tags") ?? "")
@@ -221,7 +246,7 @@ export function KnowledgeManager({
       formElement.reset();
       if (noteEditorRef.current) noteEditorRef.current.innerHTML = "";
       setComposerOpen(false);
-      toast.success(`Note added to ${agentName}’s notebook and queued for learning.`);
+      toast.success(`Note added to ${activeAgent?.name ?? agentName}’s notebook and queued for learning.`);
       await mutate();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save note");
@@ -236,7 +261,7 @@ export function KnowledgeManager({
     setIsSubmitting(true);
     try {
       const upload = new FormData(formElement);
-      upload.set("agentId", agentId);
+      upload.set("agentId", activeAgentId);
       await mutateSource("/api/knowledge", {
         method: "POST",
         body: upload,
@@ -244,7 +269,7 @@ export function KnowledgeManager({
       formElement.reset();
       setSelectedFileName("");
       setComposerOpen(false);
-      toast.success(`File added to ${agentName}’s notebook. Deep scan started.`);
+      toast.success(`File added to ${activeAgent?.name ?? agentName}’s notebook. Deep scan started.`);
       await mutate();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Upload failed");
@@ -263,7 +288,7 @@ export function KnowledgeManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agentId,
+          activeAgentId,
           title: form.get("title"),
           url: form.get("url"),
           tags: String(form.get("tags") ?? "")
@@ -319,12 +344,22 @@ export function KnowledgeManager({
               <Library size={20} />
             </span>
             <div className="max-w-2xl">
-              <p className="eyebrow">{agentName} · dedicated notebook</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAgentPickerOpen(true)}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-base font-semibold tracking-[-0.025em] transition-colors hover:bg-muted"
+                >
+                  {activeAgent?.name ?? agentName}
+                  <ChevronDown size={15} className="text-muted-foreground" />
+                </button>
+                <span className="text-base font-medium tracking-[-0.025em] text-muted-foreground">· notebook</span>
+              </div>
               <h1 className="mt-2 text-balance text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
                 Knowledge workspace
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Give {agentName} the sources it should know. This notebook view is
+                Give {activeAgent?.name ?? agentName} the sources it should know. This notebook view is
                 isolated from your other agents.
               </p>
             </div>
@@ -364,7 +399,7 @@ export function KnowledgeManager({
               </p>
             </div>
             <span className="hidden text-xs text-muted-foreground sm:block">
-              Available only to {agentName}
+              Available only to {activeAgent?.name ?? agentName}
             </span>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
@@ -409,7 +444,7 @@ export function KnowledgeManager({
             <div>
               <p className="eyebrow">Source library</p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight">
-                {agentName}’s notebook
+                {activeAgent?.name ?? agentName}’s notebook
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Browse and manage the sources this agent can reference.
@@ -732,6 +767,57 @@ export function KnowledgeManager({
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={agentPickerOpen} onOpenChange={setAgentPickerOpen}>
+        <DialogContent className="rounded-2xl p-0 sm:max-w-xl">
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <DialogTitle>Select agent notebook</DialogTitle>
+            <DialogDescription>
+              Choose which agent&apos;s knowledge to view and manage.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[26rem] overflow-y-auto border-t p-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {agents.map((agent) => {
+                const colorClass = agentColorStyles[agent.color] ?? agentColorStyles.violet;
+                const isSelected = agent.id === activeAgentId;
+                return (
+                  <button
+                    key={agent.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveAgentId(agent.id);
+                      setAgentPickerOpen(false);
+                    }}
+                    className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-colors ${
+                      isSelected
+                        ? "border-primary/30 bg-primary/10"
+                        : "hover:border-primary/20 hover:bg-muted"
+                    }`}
+                  >
+                    <span
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-xl border text-sm font-semibold uppercase ${colorClass}`}
+                    >
+                      {agent.name.charAt(0)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">
+                        {agent.name}
+                        {isSelected ? (
+                          <CheckCircle2 size={12} className="ml-1 inline-block text-primary" />
+                        ) : null}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">
+                        {agent.description || "No description"}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
@@ -881,141 +967,300 @@ function SourceCard({
     (version) => version.status === "READY",
   );
   const canManage = isAdmin || source.createdById === currentUserId;
+  const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState<{
+    currentVersion?: {
+      extractedText?: string | null;
+      metadata?: { pages?: Array<{ url: string; title?: string }> } | null;
+    } | null;
+    versions?: Array<{ id: string; version: number; status: string; extractedText?: string | null; metadata?: { pages?: Array<{ url: string; title?: string }> } | null }>;
+  } | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  const toggleExpand = useCallback(async () => {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+    setExpanded(true);
+    if (!detail && !loadingDetail) {
+      setLoadingDetail(true);
+      try {
+        const res = await fetch(`/api/knowledge/${source.id}`);
+        if (res.ok) {
+          const body = await res.json();
+          setDetail(body.source ?? null);
+        }
+      } catch {
+        // silently ignore fetch errors
+      } finally {
+        setLoadingDetail(false);
+      }
+    }
+  }, [expanded, detail, loadingDetail, source.id]);
+
+  const hasContent =
+    (source.type === "URL" &&
+      detail?.currentVersion?.metadata?.pages &&
+      detail.currentVersion.metadata.pages.length > 1) ||
+    Boolean(detail?.currentVersion?.extractedText);
 
   return (
-    <article className="group flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-md sm:flex-row sm:items-center sm:p-5">
-      <div className="flex items-center justify-between gap-3 sm:self-start">
-        <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${meta.color}`}
-        >
-          <Icon size={18} />
-        </span>
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium sm:hidden ${
-            source.status === "APPROVED"
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-              : source.status === "PROCESSING"
-                ? "bg-sky-500/10 text-sky-700 dark:text-sky-300"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-          }`}
-        >
-          {source.status === "APPROVED" ? <CheckCircle2 size={12} /> : null}
-          {statusLabel(source.status)}
-        </span>
-      </div>
+    <article className="overflow-hidden rounded-xl border bg-card shadow-sm transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-md">
+      <div className="group flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+        <div className="flex items-center justify-between gap-3 sm:self-start">
+          <span
+            className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${meta.color}`}
+          >
+            <Icon size={18} />
+          </span>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium sm:hidden ${
+              source.status === "APPROVED"
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : source.status === "PROCESSING"
+                  ? "bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                  : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+            }`}
+          >
+            {source.status === "APPROVED" ? <CheckCircle2 size={12} /> : null}
+            {statusLabel(source.status)}
+          </span>
+        </div>
 
-      <div className="min-w-0 flex-1">
-        <Link
-          href={`/knowledge/${source.id}`}
-          className="line-clamp-2 font-semibold leading-5 transition-colors group-hover:text-primary"
-        >
-          {source.title}
-        </Link>
-        <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">
-          {meta.label} · By {source.createdBy.email.split("@")[0]} · v
-          {latest?.version ?? 1} · {latest?._count.chunks ?? 0} passages
-        </p>
-        <div className="mt-3 flex min-h-6 flex-wrap items-center gap-1.5">
-          {source.tags.slice(0, 4).map((tag) => (
-            <span
-              key={tag}
-              className="rounded-md bg-muted px-2 py-1 text-[10px] text-muted-foreground"
-            >
-              #{tag}
-            </span>
-          ))}
-          {source.tags.length > 4 ? (
-            <span className="text-[10px] text-muted-foreground">
-              +{source.tags.length - 4} more
-            </span>
+        <div className="min-w-0 flex-1">
+          <Link
+            href={`/knowledge/${source.id}`}
+            className="line-clamp-2 font-semibold leading-5 transition-colors group-hover:text-primary"
+          >
+            {source.title}
+          </Link>
+          <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">
+            {meta.label} · By {source.createdBy.email.split("@")[0]} · v
+            {latest?.version ?? 1} · {latest?._count.chunks ?? 0} passages
+          </p>
+          <div className="mt-3 flex min-h-6 flex-wrap items-center gap-1.5">
+            {source.tags.slice(0, 4).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-md bg-muted px-2 py-1 text-[10px] text-muted-foreground"
+              >
+                #{tag}
+              </span>
+            ))}
+            {source.tags.length > 4 ? (
+              <span className="text-[10px] text-muted-foreground">
+                +{source.tags.length - 4} more
+              </span>
+            ) : null}
+          </div>
+
+          {job && ["QUEUED", "PROCESSING"].includes(job.status) ? (
+            <div className="mt-3 max-w-md">
+              <div className="mb-1 flex justify-between text-[10px] capitalize text-muted-foreground">
+                <span>{job.stage.replaceAll("_", " ")}</span>
+                <span>{job.progress}%</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${job.progress}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
+          {job?.errorMessage || latest?.errorMessage ? (
+            <p className="mt-2 text-xs text-destructive">
+              {job?.errorMessage ?? latest?.errorMessage}
+            </p>
           ) : null}
         </div>
 
-        {job && ["QUEUED", "PROCESSING"].includes(job.status) ? (
-          <div className="mt-3 max-w-md">
-            <div className="mb-1 flex justify-between text-[10px] capitalize text-muted-foreground">
-              <span>{job.stage.replaceAll("_", " ")}</span>
-              <span>{job.progress}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${job.progress}%` }}
-              />
-            </div>
-          </div>
-        ) : null}
-        {job?.errorMessage || latest?.errorMessage ? (
-          <p className="mt-2 text-xs text-destructive">
-            {job?.errorMessage ?? latest?.errorMessage}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t pt-3 sm:w-36 sm:flex-col sm:items-end sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
-        <span
-          className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium sm:inline-flex ${
-            source.status === "APPROVED"
-              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-              : source.status === "PROCESSING"
-                ? "bg-sky-500/10 text-sky-700 dark:text-sky-300"
-                : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-          }`}
-        >
-          {source.status === "APPROVED" ? <CheckCircle2 size={12} /> : null}
-          {statusLabel(source.status)}
-        </span>
-
-        {(readyVersion && isAdmin) || canManage ? (
-          <div className="flex w-full items-center justify-end gap-2 sm:mt-auto">
-            {readyVersion && isAdmin ? (
-              <Button
-                size="sm"
-                className="h-8 flex-1 gap-1.5 sm:flex-none"
-                onClick={() =>
-                  runAction(
-                    "Memory published as trusted",
-                    `/api/knowledge/${source.id}/approve`,
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ versionId: readyVersion.id }),
-                    },
-                  )
-                }
-              >
-                <ShieldCheck size={13} /> Publish
-              </Button>
-            ) : null}
-            {canManage ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Delete ${source.title}`}
-                className="h-8 px-2 text-muted-foreground hover:text-destructive"
-                onClick={() => {
-                  if (window.confirm(`Delete ${source.title}?`)) {
-                    void runAction(
-                      "Memory deleted",
-                      `/api/knowledge/${source.id}`,
-                      { method: "DELETE" },
-                    );
-                  }
-                }}
-              >
-                <Trash2 size={14} />
-              </Button>
-            ) : null}
-          </div>
-        ) : (
-          <Link
-            href={`/knowledge/${source.id}`}
-            className="text-xs font-medium text-primary hover:underline"
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t pt-3 sm:w-36 sm:flex-col sm:items-end sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+          <span
+            className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium sm:inline-flex ${
+              source.status === "APPROVED"
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : source.status === "PROCESSING"
+                  ? "bg-sky-500/10 text-sky-700 dark:text-sky-300"
+                  : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+            }`}
           >
-            View source
-          </Link>
-        )}
+            {source.status === "APPROVED" ? <CheckCircle2 size={12} /> : null}
+            {statusLabel(source.status)}
+          </span>
+
+          {canManage ? (
+            <div className="flex w-full items-center justify-end gap-2 sm:mt-auto">
+              {readyVersion && canManage ? (
+                <Button
+                  size="sm"
+                  className="h-8 flex-1 gap-1.5 sm:flex-none"
+                  onClick={() =>
+                    runAction(
+                      "Memory published as trusted",
+                      `/api/knowledge/${source.id}/approve`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ versionId: readyVersion.id }),
+                      },
+                    )
+                  }
+                >
+                  <ShieldCheck size={13} /> Publish
+                </Button>
+              ) : null}
+              {canManage ? (
+                <>
+                  {source.status === "FAILED" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={() =>
+                        runAction(
+                          "Scan retried — re-crawling source",
+                          `/api/knowledge/${source.id}/rescan`,
+                          { method: "POST" },
+                        )
+                      }
+                    >
+                      <RefreshCw size={12} /> Retry
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Delete ${source.title}`}
+                    className="h-8 px-2 text-muted-foreground hover:text-destructive"
+                    onClick={() => {
+                      if (window.confirm(`Delete ${source.title}?`)) {
+                        void runAction(
+                          "Memory deleted",
+                          `/api/knowledge/${source.id}`,
+                          { method: "DELETE" },
+                        );
+                      }
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          ) : (
+            <Link
+              href={`/knowledge/${source.id}`}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View source
+            </Link>
+          )}
+        </div>
       </div>
+
+      {/* Expand toggle — only show for processed sources */}
+      {!job || !["QUEUED", "PROCESSING"].includes(job.status) ? (
+        <>
+          <button
+            type="button"
+            onClick={toggleExpand}
+            className="flex w-full items-center justify-center gap-1.5 border-t bg-muted/30 px-4 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            <ChevronDown
+              size={13}
+              className={`transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
+            />
+            {expanded ? "Collapse" : "Preview learned content"}
+          </button>
+
+          {expanded ? (
+            <div className="border-t bg-muted/20 px-4 py-4 sm:px-5">
+              {loadingDetail ? (
+                <div className="space-y-2">
+                  <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
+                </div>
+              ) : !hasContent ? (
+                <p className="text-xs text-muted-foreground">
+                  No extracted text available yet for this source.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {/* Crawled pages (URL sources only) */}
+                  {source.type === "URL" &&
+                  detail?.currentVersion?.metadata?.pages &&
+                  detail.currentVersion.metadata.pages.length > 1 ? (
+                    <div>
+                      <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Crawled {detail.currentVersion.metadata.pages.length} pages
+                      </p>
+                      <div className="max-h-36 overflow-y-auto rounded-lg border bg-background p-2.5">
+                        <ul className="space-y-1">
+                          {detail.currentVersion.metadata.pages.map(
+                            (page, index) => (
+                              <li
+                                key={index}
+                                className="flex items-start gap-2 text-[11px] leading-5"
+                              >
+                                <span className="mt-0.5 shrink-0 font-mono text-[10px] text-muted-foreground">
+                                  {index + 1}.
+                                </span>
+                                <span className="min-w-0 truncate">
+                                  {page.title ? (
+                                    <span className="font-medium">
+                                      {page.title}
+                                    </span>
+                                  ) : null}
+                                  {page.title ? (
+                                    <span className="mx-1 text-muted-foreground">
+                                      ·
+                                    </span>
+                                  ) : null}
+                                  <a
+                                    href={page.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-muted-foreground hover:text-primary hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {page.url}
+                                  </a>
+                                </span>
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Extracted text preview */}
+                  {detail?.currentVersion?.extractedText ? (
+                    <div>
+                      <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Extracted text
+                      </p>
+                      <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-background p-3 text-[11px] leading-5 text-muted-foreground">
+                        {detail.currentVersion.extractedText}
+                      </pre>
+                    </div>
+                  ) : null}
+
+                  <Link
+                    href={`/knowledge/${source.id}`}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                  >
+                    Open full source <ArrowRight size={11} />
+                  </Link>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </article>
   );
 }

@@ -4,6 +4,7 @@ import { googleProviderAdapter } from "./google";
 import { groqProviderAdapter } from "./groq";
 import { mistralProviderAdapter } from "./mistral";
 import { openAIProviderAdapter } from "./openai";
+import { zhipuProviderAdapter } from "./zhipu";
 
 import type { AIProviderAdapter } from "./types";
 
@@ -14,6 +15,7 @@ const providerAdapters = [
   deepseekProviderAdapter,
   mistralProviderAdapter,
   groqProviderAdapter,
+  zhipuProviderAdapter,
 ] as const;
 
 const providerRegistry = new Map<string, AIProviderAdapter>(

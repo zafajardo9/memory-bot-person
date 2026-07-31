@@ -42,6 +42,16 @@ const profileFields = {
   mood: z.enum(AGENT_MOODS).default("balanced"),
   responseLength: z.enum(RESPONSE_LENGTHS).default("balanced"),
   customInstructions: z.string().trim().max(6000).default(""),
+  responseLayers: z
+    .array(
+      z.object({
+        id: z.string(),
+        label: z.string().trim().min(1).max(80),
+        content: z.string().trim().max(2000),
+      }),
+    )
+    .max(20)
+    .optional(),
   providerId: z.string().trim().min(1).max(50).nullable().optional(),
   modelId: z.string().trim().min(1).max(200).nullable().optional(),
   enabledTools: z.array(z.enum(AGENT_TOOLS)).max(AGENT_TOOLS.length).default([...AGENT_TOOLS]),
@@ -58,12 +68,33 @@ export function agentSettingsFromProfile(profile: {
   mood: string;
   responseLength: string;
   customInstructions: string;
+  responseLayers?: unknown;
 }) {
+  const rawLayers = Array.isArray(profile.responseLayers)
+    ? profile.responseLayers
+    : [];
+  const layers: { id: string; label: string; content: string }[] = [];
+  for (const item of rawLayers) {
+    if (
+      item &&
+      typeof item === "object" &&
+      "id" in item &&
+      "label" in item &&
+      "content" in item
+    ) {
+      layers.push({
+        id: String((item as Record<string, unknown>).id),
+        label: String((item as Record<string, unknown>).label),
+        content: String((item as Record<string, unknown>).content),
+      });
+    }
+  }
   return {
     agentName: profile.name,
     mood: z.enum(AGENT_MOODS).parse(profile.mood),
     responseLength: z.enum(RESPONSE_LENGTHS).parse(profile.responseLength),
     customInstructions: profile.customInstructions,
+    responseLayers: layers,
   };
 }
 

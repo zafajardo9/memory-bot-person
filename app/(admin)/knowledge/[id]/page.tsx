@@ -33,7 +33,7 @@ export default async function KnowledgeSourcePage({
         </p>
       </header>
 
-      {canEdit ? <KnowledgeSourceActions sourceId={source.id} sourceType={source.type} initialContent={source.versions[0]?.extractedText ?? ""} /> : null}
+      {canEdit ? <KnowledgeSourceActions sourceId={source.id} sourceType={source.type} sourceStatus={source.status} initialContent={source.versions[0]?.extractedText ?? ""} /> : null}
 
       {source.versions.map((version) => (
         <section key={version.id} className="rounded-lg border bg-card p-5">

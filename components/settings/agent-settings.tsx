@@ -10,9 +10,10 @@ import {
   Sparkles,
   Trash2,
   Wrench,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -34,6 +35,7 @@ import {
   RESPONSE_LENGTHS,
   type AgentMood,
   type AgentSettings,
+  type ResponseLayer,
   type ResponseLength,
 } from "@/lib/agent-settings";
 import { AGENT_TOOLS, type AgentTool } from "@/lib/agents";
@@ -141,6 +143,8 @@ export function AgentSettingsPanel({
 
   const [activeTab, setActiveTab] = useState<"voice" | "tools" | "memories">("voice");
 
+  const layerId = useId();
+
   const hasChanges = useMemo(
     () =>
       JSON.stringify(settings) !== JSON.stringify(savedSettings) ||
@@ -159,6 +163,7 @@ export function AgentSettingsPanel({
           mood: settings.mood,
           responseLength: settings.responseLength,
           customInstructions: settings.customInstructions,
+          responseLayers: settings.responseLayers,
           enabledTools,
         }),
       });
@@ -171,6 +176,7 @@ export function AgentSettingsPanel({
           mood: AgentMood;
           responseLength: ResponseLength;
           customInstructions: string;
+          responseLayers?: ResponseLayer[];
           enabledTools: string[];
         };
       };
@@ -179,6 +185,7 @@ export function AgentSettingsPanel({
         mood: data.agent.mood,
         responseLength: data.agent.responseLength,
         customInstructions: data.agent.customInstructions,
+        responseLayers: data.agent.responseLayers ?? [],
       };
       setSettings(nextSettings);
       setSavedSettings(nextSettings);
@@ -456,6 +463,124 @@ export function AgentSettingsPanel({
                     These preferences shape delivery. Privacy, safety, and
                     approved company sources always keep priority.
                   </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium">Response layers</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Structure how the agent breaks down its answers — add
+                        labels like Summarization, Details, or Related Keywords
+                        with instructions for each.
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      {settings.responseLayers.length}/20
+                    </span>
+                  </div>
+
+                  {settings.responseLayers.length > 0 ? (
+                    <div className="space-y-3">
+                      {settings.responseLayers.map((layer, index) => (
+                        <div
+                          key={layer.id}
+                          className="group relative rounded-xl border bg-muted/30 p-4"
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSettings((current) => ({
+                                ...current,
+                                responseLayers: current.responseLayers.filter(
+                                  (l) => l.id !== layer.id,
+                                ),
+                              }))
+                            }
+                            className="absolute top-2 right-2 rounded-md p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                            aria-label={`Remove ${layer.label || "layer"}`}
+                          >
+                            <X size={14} />
+                          </button>
+                          <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+                            <Input
+                              value={layer.label}
+                              maxLength={80}
+                              onChange={(event) =>
+                                setSettings((current) => {
+                                  const updated = [...current.responseLayers];
+                                  updated[index] = {
+                                    ...updated[index],
+                                    label: event.target.value,
+                                  };
+                                  return {
+                                    ...current,
+                                    responseLayers: updated,
+                                  };
+                                })
+                              }
+                              placeholder="Summarization"
+                              className="h-9 rounded-lg text-sm"
+                            />
+                            <Textarea
+                              value={layer.content}
+                              maxLength={2000}
+                              rows={2}
+                              onChange={(event) =>
+                                setSettings((current) => {
+                                  const updated = [...current.responseLayers];
+                                  updated[index] = {
+                                    ...updated[index],
+                                    content: event.target.value,
+                                  };
+                                  return {
+                                    ...current,
+                                    responseLayers: updated,
+                                  };
+                                })
+                              }
+                              placeholder="Start with a 2–3 sentence summary before diving into details."
+                              className="resize-y rounded-lg text-sm"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed py-8 text-center">
+                      <p className="text-sm font-medium text-muted-foreground">
+                        No response layers yet
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Add structured guidelines like Summarization, Details,
+                        or Related Keywords.
+                      </p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={settings.responseLayers.length >= 20}
+                    onClick={() =>
+                      setSettings((current) => ({
+                        ...current,
+                        responseLayers: [
+                          ...current.responseLayers,
+                          {
+                            id: `${layerId}-${current.responseLayers.length}`,
+                            label: "",
+                            content: "",
+                          },
+                        ],
+                      }))
+                    }
+                    className="rounded-lg"
+                  >
+                    <Plus size={14} />
+                    Add layer
+                  </Button>
                 </div>
 
                 <div className="flex justify-end border-t pt-5">

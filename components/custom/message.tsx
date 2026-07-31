@@ -7,7 +7,9 @@ import {
   isToolUIPart,
   type UIMessage,
 } from "ai";
-import { Paperclip } from "lucide-react";
+import { Check, Copy, Paperclip } from "lucide-react";
+import { useCallback, useState } from "react";
+import { toast } from "sonner";
 
 import { AssistantActivity } from "./assistant-activity";
 import { ChatMarkdown } from "./chat-markdown";
@@ -43,6 +45,31 @@ export const Message = ({
   const sources = message.parts.filter((part) => part.type === "source-url");
   const isAssistant = role === "assistant";
   const showAnswer = isAssistant && Boolean(content);
+
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!content) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      toast.success("Copied");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy");
+    }
+  }, [content]);
+
+  const copyButton = (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+      aria-label={copied ? "Copied" : "Copy message"}
+    >
+      {copied ? <Check size={12} /> : <Copy size={12} />}
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
 
   return (
     <article
@@ -132,6 +159,8 @@ export const Message = ({
           </div>
         ) : null}
 
+        {isAssistant && content ? copyButton : null}
+
         {showFollowUps && content ? (
           <FollowUpQuestions
             assistantMessage={content}
@@ -140,6 +169,8 @@ export const Message = ({
             onSelect={onSelectFollowUp}
           />
         ) : null}
+
+        {!isAssistant && content ? copyButton : null}
       </div>
     </article>
   );

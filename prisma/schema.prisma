@@ -75,6 +75,7 @@ model Agent {
   mood               String                 @default("balanced") @db.VarChar(30)
   responseLength     String                 @default("balanced") @db.VarChar(30)
   customInstructions String                 @default("") @db.Text
+  responseLayers     Json?                                                    // structured response layering: [{label, content}]
   providerId         String?                @db.VarChar(50)
   modelId            String?                @db.VarChar(200)
   enabledTools       String[]               @default(["knowledge", "memory", "web", "browser", "weather", "flights"])
