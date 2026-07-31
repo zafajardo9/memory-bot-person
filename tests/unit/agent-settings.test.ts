@@ -9,7 +9,7 @@ import {
 describe("agent settings", () => {
   it("provides a usable zero-configuration profile", () => {
     expect(DEFAULT_AGENT_SETTINGS).toEqual({
-      agentName: "Memory",
+      agentName: "Kairo",
       mood: "balanced",
       responseLength: "balanced",
       customInstructions: "",

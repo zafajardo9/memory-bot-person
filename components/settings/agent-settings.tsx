@@ -355,7 +355,7 @@ export function AgentSettingsPanel({
                         }))
                       }
                       className="h-11 rounded-xl"
-                      placeholder="Memory"
+                      placeholder="Kairo"
                     />
                     <p className="text-xs text-muted-foreground">
                       This name appears in chat and in the message composer.

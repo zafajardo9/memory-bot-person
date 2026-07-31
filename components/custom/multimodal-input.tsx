@@ -377,7 +377,7 @@ export function MultimodalInput({
       </div>
 
       <div className="flex items-center justify-center gap-3 px-10 text-center text-[10px] text-muted-foreground sm:justify-between sm:px-2 sm:text-left">
-        <span>Memory can make mistakes. Verify important information.</span>
+        <span>Kairo can make mistakes. Verify important information.</span>
         <span className="hidden shrink-0 sm:inline">
           <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono">Shift ↵</kbd>{" "}
           for a new line

@@ -9,7 +9,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://gemini.vercel.ai"),
-  title: "Memory — Company knowledge assistant",
+  title: "Kairo — Company knowledge assistant",
   description: "Capture, organize, and ask questions across your company knowledge.",
 };
 

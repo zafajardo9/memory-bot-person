@@ -29,7 +29,7 @@ export interface AgentSettings {
 }
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
-  agentName: "Memory",
+  agentName: "Kairo",
   mood: "balanced",
   responseLength: "balanced",
   customInstructions: "",

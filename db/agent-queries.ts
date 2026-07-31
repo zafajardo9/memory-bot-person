@@ -47,7 +47,7 @@ export async function ensureDefaultAgent(userId: string) {
     data: {
       userId,
       slug: "memory",
-      name: legacySettings?.agentName ?? "Memory",
+      name: legacySettings?.agentName ?? "Kairo",
       mood: legacySettings?.mood ?? "balanced",
       responseLength: legacySettings?.responseLength ?? "balanced",
       customInstructions: legacySettings?.customInstructions ?? "",
