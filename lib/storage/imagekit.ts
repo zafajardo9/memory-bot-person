@@ -7,9 +7,9 @@ let _configured: boolean | null = null;
 
 function getClient(): ImageKit | null {
   if (_configured === null) {
-    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
-    if (privateKey && privateKey.trim().length > 0) {
-      _client = new ImageKit({ privateKey: privateKey.trim() });
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY?.trim();
+    if (privateKey) {
+      _client = new ImageKit({ privateKey });
       _configured = true;
     } else {
       _configured = false;

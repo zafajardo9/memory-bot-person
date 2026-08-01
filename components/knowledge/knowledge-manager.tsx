@@ -234,7 +234,7 @@ export function KnowledgeManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "NOTE",
-          activeAgentId,
+          agentId: activeAgentId,
           title: form.get("title"),
           content,
           tags: String(form.get("tags") ?? "")
@@ -288,7 +288,7 @@ export function KnowledgeManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          activeAgentId,
+          agentId: activeAgentId,
           title: form.get("title"),
           url: form.get("url"),
           tags: String(form.get("tags") ?? "")
