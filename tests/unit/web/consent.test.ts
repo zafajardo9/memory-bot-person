@@ -135,6 +135,20 @@ describe("web research consent", () => {
     expect(instruction).toContain('"Comparison"');
   });
 
+  it("uses a proactive, synthesis-first instruction in Deep mode", () => {
+    const instruction = webResearchInstruction(true, "", true);
+    expect(instruction).toContain("DEEP RESEARCH MODE");
+    expect(instruction).toContain("pre-approved and expected");
+    expect(instruction).toContain("Synthesize, don't juxtapose");
+    // Deep mode drops the rigid three-section separation in favor of synthesis.
+    expect(instruction).not.toContain('"Notebook findings"');
+  });
+
+  it("still blocks web access in Deep mode when consent is not granted", () => {
+    const instruction = webResearchInstruction(false, "", true);
+    expect(instruction).toContain("web tools are unavailable");
+  });
+
   it("routes supplied links through extraction, research, and explicit memory", () => {
     const instruction = webResearchInstruction(
       true,

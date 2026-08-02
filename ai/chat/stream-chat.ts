@@ -71,9 +71,12 @@ export async function streamCompanyChat(input: {
   messages: UIMessage[];
   userId: string;
   agentId: string;
+  researchDepth?: string;
 }) {
   const userText = latestUserText(input.messages);
-  const webAccessApproved = hasWebResearchConsent(input.messages);
+  const isDeepMode = input.researchDepth === "deep";
+  const webAccessApproved =
+    hasWebResearchConsent(input.messages) || isDeepMode;
   const agent = await getAgentForUserDetailed(input.agentId, input.userId);
   if (!agent) throw new Error("Agent not found.");
   const [selected] = await Promise.all([
@@ -118,7 +121,7 @@ export async function streamCompanyChat(input: {
 
   const result = streamText({
     model,
-    system: `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText)}\n\n${formatAgentSettingsForPrompt(agentSettings)}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`,
+    system: `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText, isDeepMode)}\n\n${formatAgentSettingsForPrompt(agentSettings)}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`,
     messages: modelMessages,
     stopWhen: stepCountIs(14),
     tools,

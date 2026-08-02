@@ -16,6 +16,7 @@ const chatRequestSchema = z.object({
   id: z.string().uuid(),
   agentId: z.string().uuid(),
   messages: z.array(z.custom<UIMessage>()),
+  researchDepth: z.enum(["quick", "deep"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -25,12 +26,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, agentId, messages } = chatRequestSchema.parse(await request.json());
+    const { id, agentId, messages, researchDepth } = chatRequestSchema.parse(
+      await request.json(),
+    );
+    const existingChat = await getChatById({ id });
+    const resolvedDepth =
+      researchDepth ?? existingChat?.researchDepth ?? "quick";
     const { result, extractionModel, memoryEnabled } = await streamCompanyChat({
       chatId: id,
       messages,
       userId: session.user.id,
       agentId,
+      researchDepth: resolvedDepth,
     });
 
     return result.toUIMessageStreamResponse({
@@ -45,6 +52,7 @@ export async function POST(request: Request) {
             messages: finishedMessages,
             userId: session.user!.id!,
             agentId,
+            researchDepth: resolvedDepth,
           });
           if (memoryEnabled && isUserMemoryEnabled() && isAutoMemoryEnabled()) {
             try {
