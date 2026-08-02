@@ -26,6 +26,7 @@ import { ListFlights } from "@/components/flights/list-flights";
 import { SelectSeats } from "@/components/flights/select-seats";
 import { VerifyPayment } from "@/components/flights/verify-payment";
 
+import { KnowledgeSourceCards } from "./knowledge-source-cards";
 import { Weather } from "./weather";
 
 import type {
@@ -288,10 +289,10 @@ function ToolOutput({
 
   if (toolName === "webSearch") return <WebSearchOutput output={output} />;
   if (toolName === "readWebPage") return <ReadWebPageOutput output={output} />;
-  if (
-    toolName === "searchCompanyKnowledge" ||
-    toolName === "readCompanyKnowledge"
-  ) {
+  if (toolName === "searchCompanyKnowledge") {
+    return <KnowledgeSourceCards output={output} />;
+  }
+  if (toolName === "readCompanyKnowledge") {
     return null;
   }
   if (toolName === "getWeather") {
@@ -507,6 +508,40 @@ function SourcesActivity({ sources }: { sources: SourceUrlUIPart[] }) {
   );
 }
 
+function researchSummary(tools: ActivityToolPart[]) {
+  let notebookSources = 0;
+  let webSources = 0;
+  let researchingNow = false;
+
+  for (const part of tools) {
+    const toolName =
+      part.type === "dynamic-tool" ? part.toolName : part.type.slice(5);
+
+    if (
+      toolName === "searchCompanyKnowledge" ||
+      toolName === "readCompanyKnowledge" ||
+      toolName === "webSearch" ||
+      toolName === "readWebPage" ||
+      toolName === "browseWebPage"
+    ) {
+      if (part.state !== "output-available") researchingNow = true;
+    }
+
+    if (part.state !== "output-available") continue;
+    const output = part.output;
+    if (!isRecord(output)) continue;
+
+    if (toolName === "searchCompanyKnowledge" && Array.isArray(output.results)) {
+      notebookSources += output.results.length;
+    }
+    if (toolName === "webSearch" && Array.isArray(output.results)) {
+      webSources += output.results.length;
+    }
+  }
+
+  return { notebookSources, webSources, researchingNow };
+}
+
 export function AssistantActivity({
   chatId,
   reasoning,
@@ -525,6 +560,19 @@ export function AssistantActivity({
 
   if (!hasActivity && !isActive) return null;
 
+  const { notebookSources, webSources, researchingNow } =
+    researchSummary(tools);
+  const totalSources = notebookSources + webSources;
+  const sourcePhrase =
+    totalSources === 0
+      ? ""
+      : ` · ${totalSources} source${totalSources === 1 ? "" : "s"}`;
+  const headerLabel = isActive
+    ? researchingNow
+      ? `Researching${sourcePhrase}…`
+      : "Composing your answer…"
+    : `Researched${sourcePhrase}`;
+
   return (
     <section aria-label="Assistant work trace" className="text-sm">
       <details className="group/work" open={isActive || undefined}>
@@ -534,9 +582,7 @@ export function AssistantActivity({
           ) : (
             <Check size={13} className="text-emerald-600" />
           )}
-          <span>
-            {isActive ? "Working on your answer…" : "How this answer was prepared"}
-          </span>
+          <span>{headerLabel}</span>
           <ChevronDown
             size={12}
             className="transition-transform group-open/work:rotate-180"

@@ -1,16 +1,16 @@
 import "server-only";
 
-import type { LanguageModel } from "ai";
 
 import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 import { embedKnowledgeQuery } from "./embeddings";
-import { assertKnowledgeQueryRateLimit } from "./rate-limit";
 import { assembleHybridResults } from "./ranking";
+import { assertKnowledgeQueryRateLimit } from "./rate-limit";
 import { rerankWithModel } from "./rerank";
 
 import type { KnowledgeSearchResult } from "./types";
+import type { LanguageModel } from "ai";
 
 interface SearchRow {
   chunkId: string;
