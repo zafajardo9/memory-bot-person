@@ -155,13 +155,14 @@ model UserAiSelection {
 }
 
 model Chat {
-  id        String   @id @default(uuid()) @db.Uuid
-  createdAt DateTime @default(now())
-  messages  Json
-  userId    String   @db.Uuid
-  agentId   String   @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid()) @db.Uuid
+  createdAt     DateTime @default(now())
+  messages      Json
+  userId        String   @db.Uuid
+  agentId       String   @db.Uuid
+  researchDepth String?  @default("quick")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent         Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([agentId, createdAt])
@@ -294,6 +295,7 @@ model KnowledgeQueryLog {
   retrievedChunkIds String[] @default([])
   resultCount       Int
   latencyMs         Int
+  feedback          Int?
   createdAt         DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   agent             Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)

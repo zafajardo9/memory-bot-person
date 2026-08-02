@@ -51,11 +51,13 @@ export async function saveChat({
   messages,
   userId,
   agentId,
+  researchDepth,
 }: {
   id: string;
   messages: unknown;
   userId: string;
   agentId: string;
+  researchDepth?: string;
 }) {
   const existing = await prisma.chat.findUnique({
     where: { id },
@@ -81,9 +83,11 @@ export async function saveChat({
       messages: messages as unknown as Prisma.InputJsonValue,
       userId,
       agentId,
+      ...(researchDepth ? { researchDepth } : {}),
     },
     update: {
       messages: messages as unknown as Prisma.InputJsonValue,
+      ...(researchDepth ? { researchDepth } : {}),
     },
   });
 }
