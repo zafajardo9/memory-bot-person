@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Compass,
   FileUp,
   ImagePlus,
   Lightbulb,
@@ -19,6 +20,7 @@ import React, {
 import { toast } from "sonner";
 
 import { ChatErrorNotice } from "./chat-error-notice";
+import type { ResearchDepth } from "./chat";
 import { ArrowUpIcon, StopIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
 import useWindowSize from "./use-window-size";
@@ -53,6 +55,8 @@ export function MultimodalInput({
   modelSelector,
   thinking,
   onThinkingChange,
+  researchDepth,
+  onResearchDepthChange,
   agentName,
   chatError,
   clearChatError,
@@ -73,6 +77,8 @@ export function MultimodalInput({
   modelSelector: React.ReactNode;
   thinking: boolean;
   onThinkingChange: (value: boolean) => void;
+  researchDepth: ResearchDepth;
+  onResearchDepthChange: (value: ResearchDepth) => void;
   agentName: string;
   chatError?: Error;
   clearChatError: () => void;
@@ -305,6 +311,30 @@ export function MultimodalInput({
           >
             <Lightbulb size={13} />
             Think
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              onResearchDepthChange(researchDepth === "deep" ? "quick" : "deep")
+            }
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+              researchDepth === "deep"
+                ? "border-primary/25 bg-primary/10 text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            title={
+              researchDepth === "deep"
+                ? "Deep: Notebook + web corroboration"
+                : "Quick: Notebook only"
+            }
+            aria-label={
+              researchDepth === "deep"
+                ? "Switch to Quick research"
+                : "Switch to Deep research"
+            }
+          >
+            <Compass size={13} />
+            {researchDepth === "deep" ? "Deep" : "Quick"}
           </button>
           <div className="min-w-0 flex-1" />
 

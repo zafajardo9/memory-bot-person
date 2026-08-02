@@ -7,7 +7,7 @@ import {
   type FileUIPart,
   type UIMessage,
 } from "ai";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { Message as PreviewMessage } from "@/components/custom/message";
 import { useScrollToBottom } from "@/components/custom/use-scroll-to-bottom";
@@ -15,6 +15,8 @@ import { useScrollToBottom } from "@/components/custom/use-scroll-to-bottom";
 import { ModelSelector } from "./model-selector";
 import { MultimodalInput } from "./multimodal-input";
 import { Overview } from "./overview";
+
+export type ResearchDepth = "quick" | "deep";
 
 export function Chat({
   id,
@@ -27,6 +29,15 @@ export function Chat({
   agentName: string;
   agentId: string;
 }) {
+  const [researchDepth, setResearchDepth] = useState<ResearchDepth>("quick");
+  // Mirror depth in a ref so the (stable) transport body closure always reads
+  // the current value without re-creating the transport on every toggle.
+  const researchDepthRef = useRef<ResearchDepth>(researchDepth);
+  const handleResearchDepthChange = useCallback((depth: ResearchDepth) => {
+    researchDepthRef.current = depth;
+    setResearchDepth(depth);
+  }, []);
+
   const {
     messages,
     sendMessage,
@@ -38,7 +49,13 @@ export function Chat({
   } = useChat({
     id,
     messages: initialMessages,
-    transport: new DefaultChatTransport({ body: { id, agentId } }),
+    transport: new DefaultChatTransport({
+      body: () => ({
+        id,
+        agentId,
+        researchDepth: researchDepthRef.current,
+      }),
+    }),
     onFinish: () => {
       window.history.replaceState({}, "", `/chat/${id}`);
     },
@@ -129,6 +146,8 @@ export function Chat({
             }
             thinking={thinking}
             onThinkingChange={setThinking}
+            researchDepth={researchDepth}
+            onResearchDepthChange={handleResearchDepthChange}
             agentName={agentName}
             chatError={error}
             clearChatError={clearError}
