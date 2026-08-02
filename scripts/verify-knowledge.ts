@@ -48,7 +48,7 @@ async function main() {
     }
 
     await approveKnowledgeVersion(sourceId, version.id, user.id);
-    const results = await searchCompanyKnowledge({
+    const { results } = await searchCompanyKnowledge({
       query: "When should I prepare the operations report and who approves it?",
       userId: user.id,
       agentId: agent.id,

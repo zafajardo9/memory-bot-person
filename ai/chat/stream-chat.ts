@@ -47,7 +47,7 @@ async function knowledgePreflight(
   const query = latestUserText(messages);
   if (!query) return "";
   try {
-    const matches = await searchCompanyKnowledge({
+    const { results: matches } = await searchCompanyKnowledge({
       query,
       userId,
       chatId,

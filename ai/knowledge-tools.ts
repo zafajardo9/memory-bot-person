@@ -26,7 +26,7 @@ export function createKnowledgeTools({
         "Search the approved company knowledge base. Always use this first for company work, policy, process, project, responsibility, or how-to questions.",
       inputSchema: knowledgeSearchSchema,
       execute: async ({ query, limit }: z.infer<typeof knowledgeSearchSchema>) => {
-        const results = await searchCompanyKnowledge({
+        const { results, queryLogId } = await searchCompanyKnowledge({
           query,
           limit,
           userId,
@@ -36,6 +36,7 @@ export function createKnowledgeTools({
         });
         return {
           query,
+          queryLogId,
           found: results.length > 0,
           results,
           instruction:

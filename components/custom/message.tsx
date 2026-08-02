@@ -7,7 +7,7 @@ import {
   isToolUIPart,
   type UIMessage,
 } from "ai";
-import { Check, Copy, Paperclip } from "lucide-react";
+import { Check, Copy, Paperclip, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
@@ -47,6 +47,38 @@ export const Message = ({
   const showAnswer = isAssistant && Boolean(content);
 
   const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState<1 | -1 | null>(null);
+
+  // Attribute feedback to the most recent knowledge search in this answer.
+  const queryLogId = (() => {
+    for (let i = toolInvocations.length - 1; i >= 0; i -= 1) {
+      const output = toolInvocations[i].output as
+        | { queryLogId?: string }
+        | undefined;
+      if (output?.queryLogId) return output.queryLogId;
+    }
+    return null;
+  })();
+
+  const handleFeedback = useCallback(
+    async (value: 1 | -1) => {
+      if (!queryLogId) return;
+      setFeedback(value);
+      try {
+        const response = await fetch("/api/knowledge-feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ queryLogId, feedback: value }),
+        });
+        if (!response.ok) throw new Error("feedback failed");
+        toast.success(value === 1 ? "Thanks for the feedback" : "Noted — we'll improve this");
+      } catch {
+        setFeedback(null);
+        toast.error("Couldn't save feedback");
+      }
+    },
+    [queryLogId],
+  );
 
   const handleCopy = useCallback(async () => {
     if (!content) return;
@@ -159,7 +191,43 @@ export const Message = ({
           </div>
         ) : null}
 
-        {isAssistant && content ? copyButton : null}
+        {isAssistant && content ? (
+          <div className="flex items-center gap-1">
+            {copyButton}
+            {queryLogId && !isActive ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleFeedback(1)}
+                  disabled={feedback !== null}
+                  className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] transition-colors ${
+                    feedback === 1
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  } disabled:cursor-default`}
+                  aria-label="Good answer"
+                  aria-pressed={feedback === 1}
+                >
+                  <ThumbsUp size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFeedback(-1)}
+                  disabled={feedback !== null}
+                  className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] transition-colors ${
+                    feedback === -1
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  } disabled:cursor-default`}
+                  aria-label="Poor answer"
+                  aria-pressed={feedback === -1}
+                >
+                  <ThumbsDown size={12} />
+                </button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
 
         {showFollowUps && content ? (
           <FollowUpQuestions

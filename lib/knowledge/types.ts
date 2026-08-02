@@ -30,3 +30,8 @@ export interface KnowledgeSearchResult {
   score: number;
   citation: string;
 }
+
+export interface KnowledgeSearchOutcome {
+  results: KnowledgeSearchResult[];
+  queryLogId: string;
+}

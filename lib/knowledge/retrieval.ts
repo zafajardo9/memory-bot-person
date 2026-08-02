@@ -9,7 +9,10 @@ import { assembleHybridResults } from "./ranking";
 import { assertKnowledgeQueryRateLimit } from "./rate-limit";
 import { rerankWithModel } from "./rerank";
 
-import type { KnowledgeSearchResult } from "./types";
+import type {
+  KnowledgeSearchOutcome,
+  KnowledgeSearchResult,
+} from "./types";
 import type { LanguageModel } from "ai";
 
 interface SearchRow {
@@ -41,7 +44,7 @@ export async function searchCompanyKnowledge(input: {
   agentId: string;
   limit?: number;
   rerankModel?: LanguageModel;
-}): Promise<KnowledgeSearchResult[]> {
+}): Promise<KnowledgeSearchOutcome> {
   const startedAt = Date.now();
   await assertKnowledgeQueryRateLimit(input.userId);
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 10);
@@ -111,7 +114,7 @@ export async function searchCompanyKnowledge(input: {
     citation: citationFor(row),
   }));
 
-  await prisma.knowledgeQueryLog.create({
+  const log = await prisma.knowledgeQueryLog.create({
     data: {
       userId: input.userId,
       chatId: input.chatId,
@@ -123,7 +126,7 @@ export async function searchCompanyKnowledge(input: {
     },
   });
 
-  return results;
+  return { results, queryLogId: log.id };
 }
 
 export async function readCompanyKnowledge(chunkIds: string[], agentId: string) {
