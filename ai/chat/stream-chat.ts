@@ -56,7 +56,7 @@ async function knowledgePreflight(
       rerankModel,
     });
     return matches.length
-      ? `\n\nPreflight approved knowledge candidates (you must still call the knowledge tools before the final answer):\n${matches
+      ? `\n\nPreflight found relevant approved sources (below). Use them to plan focused sub-queries for the research protocol; you must still call the knowledge tools to gather evidence before answering — do not simply re-run the same query:\n${matches
           .map((match) => `- 【${match.citation}】 ${match.content}`)
           .join("\n")}`
       : "\n\nPreflight knowledge check found no relevant approved company source. Use the knowledge tool and do not invent company policy.";
@@ -120,7 +120,7 @@ export async function streamCompanyChat(input: {
     model,
     system: `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText)}\n\n${formatAgentSettingsForPrompt(agentSettings)}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`,
     messages: modelMessages,
-    stopWhen: stepCountIs(10),
+    stopWhen: stepCountIs(14),
     tools,
     prepareStep: ({ stepNumber }) => {
       if (stepNumber === 0 && linkPlan.reader) {
