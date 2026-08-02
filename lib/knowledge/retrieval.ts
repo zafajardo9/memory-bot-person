@@ -1,9 +1,14 @@
 import "server-only";
 
+import type { LanguageModel } from "ai";
+
+import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 import { embedKnowledgeQuery } from "./embeddings";
 import { assertKnowledgeQueryRateLimit } from "./rate-limit";
+import { assembleHybridResults } from "./ranking";
+import { rerankWithModel } from "./rerank";
 
 import type { KnowledgeSearchResult } from "./types";
 
@@ -16,8 +21,9 @@ interface SearchRow {
   section: string | null;
   pageNumber: number | null;
   sourceUrl: string | null;
-  score: number;
 }
+
+const CANDIDATE_POOL = 20;
 
 function citationFor(result: Omit<SearchRow, "score">) {
   const location = result.pageNumber
@@ -34,15 +40,15 @@ export async function searchCompanyKnowledge(input: {
   chatId?: string;
   agentId: string;
   limit?: number;
+  rerankModel?: LanguageModel;
 }): Promise<KnowledgeSearchResult[]> {
   const startedAt = Date.now();
   await assertKnowledgeQueryRateLimit(input.userId);
-  const limit = Math.min(Math.max(input.limit ?? 6, 1), 10);
+  const limit = Math.min(Math.max(input.limit ?? 8, 1), 10);
   const embedding = await embedKnowledgeQuery(input.query);
   const vector = `[${embedding.join(",")}]`;
 
-  const rows = await prisma.$queryRaw<SearchRow[]>`
-    SELECT
+  const baseSelect = Prisma.sql`
       chunk."id"::text AS "chunkId",
       source."id"::text AS "sourceId",
       version."id"::text AS "versionId",
@@ -50,11 +56,9 @@ export async function searchCompanyKnowledge(input: {
       chunk."content" AS "content",
       chunk."section" AS "section",
       chunk."pageNumber" AS "pageNumber",
-      COALESCE(chunk."sourceUrl", source."canonicalUrl") AS "sourceUrl",
-      (
-        0.65 * (1 - (chunk."embedding" <=> ${vector}::vector)) +
-        0.35 * ts_rank_cd(chunk."searchVector", websearch_to_tsquery('english', ${input.query}))
-      )::float8 AS "score"
+      COALESCE(chunk."sourceUrl", source."canonicalUrl") AS "sourceUrl"
+  `;
+  const baseFrom = Prisma.sql`
     FROM "KnowledgeChunk" chunk
     JOIN "KnowledgeSourceVersion" version ON version."id" = chunk."versionId"
     JOIN "KnowledgeSource" source ON source."id" = version."sourceId"
@@ -65,13 +69,47 @@ export async function searchCompanyKnowledge(input: {
       AND version."status" = 'APPROVED'::"KnowledgeVersionStatus"
       AND source."currentVersionId" = version."id"
       AND chunk."embedding" IS NOT NULL
-    ORDER BY "score" DESC
-    LIMIT ${limit}
   `;
 
-  const results = rows
-    .filter((row) => row.score >= 0.15)
-    .map((row) => ({ ...row, citation: citationFor(row) }));
+  const [vectorRows, ftsRows] = await Promise.all([
+    prisma.$queryRaw<SearchRow[]>`
+      SELECT ${baseSelect}
+      ${baseFrom}
+      ORDER BY chunk."embedding" <=> ${vector}::vector
+      LIMIT ${CANDIDATE_POOL}
+    `,
+    prisma.$queryRaw<SearchRow[]>`
+      SELECT ${baseSelect}
+      ${baseFrom}
+        AND chunk."searchVector" @@ websearch_to_tsquery('english', ${input.query})
+      ORDER BY ts_rank_cd(chunk."searchVector", websearch_to_tsquery('english', ${input.query})) DESC
+      LIMIT ${CANDIDATE_POOL}
+    `,
+  ]);
+
+  const fused = assembleHybridResults(vectorRows, ftsRows, CANDIDATE_POOL);
+
+  const ranked: (SearchRow & { score: number })[] = input.rerankModel
+    ? await rerankWithModel({
+        query: input.query,
+        candidates: fused,
+        model: input.rerankModel,
+        limit,
+      })
+    : fused.slice(0, limit);
+
+  const results = ranked.map((row) => ({
+    chunkId: row.chunkId,
+    sourceId: row.sourceId,
+    versionId: row.versionId,
+    title: row.title,
+    content: row.content,
+    section: row.section,
+    pageNumber: row.pageNumber,
+    sourceUrl: row.sourceUrl,
+    score: row.score,
+    citation: citationFor(row),
+  }));
 
   await prisma.knowledgeQueryLog.create({
     data: {

@@ -38,6 +38,7 @@ export async function createChatTools(input: {
           userId: input.userId,
           chatId: input.chatId,
           agentId: input.agentId,
+          model: input.model,
         })
       : {}),
     ...(publicWebEnabled && toolEnabled(input.enabledTools, "web")

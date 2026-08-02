@@ -7,14 +7,18 @@ import {
 import { knowledgeSearchSchema } from "@/lib/knowledge/validation";
 import { prisma } from "@/lib/prisma";
 
+import type { LanguageModel } from "ai";
+
 export function createKnowledgeTools({
   userId,
   chatId,
   agentId,
+  model,
 }: {
   userId: string;
   chatId: string;
   agentId: string;
+  model: LanguageModel;
 }) {
   return {
     searchCompanyKnowledge: {
@@ -28,6 +32,7 @@ export function createKnowledgeTools({
           userId,
           chatId,
           agentId,
+          rerankModel: model,
         });
         return {
           query,

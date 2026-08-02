@@ -20,4 +20,19 @@ describe("chunkSections", () => {
   it("does not return empty chunks", () => {
     expect(chunkSections([{ content: "  " }])).toEqual([]);
   });
+
+  it("prepends the section heading to embeddingText but not content", () => {
+    const chunks = chunkSections([
+      { content: "Short body.", section: "Onboarding > IT Setup" },
+    ]);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].content).toBe("Short body.");
+    expect(chunks[0].embeddingText).toContain("Onboarding > IT Setup");
+    expect(chunks[0].embeddingText).toContain("Short body.");
+  });
+
+  it("leaves embeddingText equal to content when there is no section", () => {
+    const chunks = chunkSections([{ content: "No heading here." }]);
+    expect(chunks[0].embeddingText).toBe("No heading here.");
+  });
 });

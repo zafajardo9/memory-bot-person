@@ -182,7 +182,7 @@ export async function processKnowledgeJob(jobId: string) {
 
     for (let index = 0; index < chunks.length; index += 1) {
       const chunk = chunks[index];
-      const embedding = await embedKnowledgeDocument(chunk.content, job.source.title);
+      const embedding = await embedKnowledgeDocument(chunk.embeddingText, job.source.title);
       const created = await prisma.knowledgeChunk.create({
         data: {
           versionId: job.versionId,

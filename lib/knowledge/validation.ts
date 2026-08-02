@@ -32,7 +32,7 @@ export const createNoteKnowledgeSchema = z.object({
 
 export const knowledgeSearchSchema = z.object({
   query: z.string().trim().min(2).max(1_000),
-  limit: z.number().int().min(1).max(10).default(6),
+  limit: z.number().int().min(1).max(10).default(8),
 });
 
 export function validateKnowledgeFile(file: File) {

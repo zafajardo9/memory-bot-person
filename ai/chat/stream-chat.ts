@@ -2,6 +2,7 @@ import {
   convertToModelMessages,
   stepCountIs,
   streamText,
+  type LanguageModel,
   type UIMessage,
   wrapLanguageModel,
 } from "ai";
@@ -37,6 +38,7 @@ async function knowledgePreflight(
   chatId: string,
   agentId: string,
   enabledTools: string[],
+  rerankModel: LanguageModel,
 ) {
   if (
     !isKnowledgeChatEnabled() ||
@@ -51,6 +53,7 @@ async function knowledgePreflight(
       chatId,
       agentId,
       limit: 4,
+      rerankModel,
     });
     return matches.length
       ? `\n\nPreflight approved knowledge candidates (you must still call the knowledge tools before the final answer):\n${matches
@@ -88,6 +91,7 @@ export async function streamCompanyChat(input: {
     input.chatId,
     input.agentId,
     agent.enabledTools,
+    selected.model,
   );
   const model =
     typeof selected.model === "string" ||

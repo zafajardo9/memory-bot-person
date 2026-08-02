@@ -15,6 +15,7 @@ export interface ExtractedDocument {
 export interface KnowledgeChunkInput extends ExtractedSection {
   content: string;
   tokenCount: number;
+  embeddingText: string;
 }
 
 export interface KnowledgeSearchResult {

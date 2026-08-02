@@ -7,6 +7,15 @@ export function estimateTokenCount(text: string) {
   return Math.ceil(text.length / 4);
 }
 
+/**
+ * Prepend the section heading path to the text we embed, so short or ambiguous
+ * sections carry their structural context into vector space. The stored
+ * `content` stays clean for display and citation.
+ */
+function embeddingTextFor(section: ExtractedSection, content: string) {
+  return section.section ? `${section.section}\n\n${content}` : content;
+}
+
 export function chunkSections(sections: ExtractedSection[]): KnowledgeChunkInput[] {
   const chunks: KnowledgeChunkInput[] = [];
 
@@ -20,7 +29,12 @@ export function chunkSections(sections: ExtractedSection[]): KnowledgeChunkInput
     const pushChunk = () => {
       const content = buffer.trim();
       if (!content) return;
-      chunks.push({ ...section, content, tokenCount: estimateTokenCount(content) });
+      chunks.push({
+        ...section,
+        content,
+        tokenCount: estimateTokenCount(content),
+        embeddingText: embeddingTextFor(section, content),
+      });
       buffer = content.slice(-OVERLAP_CHARS);
     };
 
@@ -33,7 +47,12 @@ export function chunkSections(sections: ExtractedSection[]): KnowledgeChunkInput
         for (let offset = 0; offset < paragraph.length; offset += TARGET_CHARS - OVERLAP_CHARS) {
           const content = paragraph.slice(offset, offset + TARGET_CHARS).trim();
           if (content) {
-            chunks.push({ ...section, content, tokenCount: estimateTokenCount(content) });
+            chunks.push({
+              ...section,
+              content,
+              tokenCount: estimateTokenCount(content),
+              embeddingText: embeddingTextFor(section, content),
+            });
           }
         }
         buffer = "";
@@ -43,10 +62,12 @@ export function chunkSections(sections: ExtractedSection[]): KnowledgeChunkInput
     }
 
     if (buffer.trim()) {
+      const content = buffer.trim();
       chunks.push({
         ...section,
-        content: buffer.trim(),
-        tokenCount: estimateTokenCount(buffer.trim()),
+        content,
+        tokenCount: estimateTokenCount(content),
+        embeddingText: embeddingTextFor(section, content),
       });
     }
   }
