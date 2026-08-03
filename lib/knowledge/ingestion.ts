@@ -99,18 +99,54 @@ async function extractUrlSource(url: string, crawlDepth: number, crawlLimit: num
     try {
       ({ document, finalUrl } = await fetchStaticUrlDocument(next.url));
     } catch (error) {
-      if (!isAgentBrowserEnabled()) throw error;
+      if (!isAgentBrowserEnabled()) {
+        // A failed secondary page must not discard useful content already
+        // extracted from the root page and its other links.
+        if (next.depth > 0 || sections.length > 0) {
+          console.warn(
+            "Skipping unreadable linked knowledge page:",
+            next.url,
+            error instanceof Error ? error.message : error,
+          );
+          continue;
+        }
+        throw error;
+      }
       console.warn(
         "Static URL fetch failed for knowledge source, falling back to Agent Browser:",
         error instanceof Error ? error.message : error,
       );
-      ({ document, finalUrl } = await renderUrlDocument(next.url));
+      try {
+        ({ document, finalUrl } = await renderUrlDocument(next.url));
+      } catch (browserError) {
+        if (next.depth > 0 || sections.length > 0) {
+          console.warn(
+            "Skipping linked page after rendered fallback failed:",
+            next.url,
+            browserError instanceof Error ? browserError.message : browserError,
+          );
+          continue;
+        }
+        throw browserError;
+      }
     }
 
     // Some pages return a valid HTML shell that renders zero text (client-side
     // JS). Retry with the headless browser when static extraction came up empty.
     if (document.sections.length === 0 && isAgentBrowserEnabled()) {
-      ({ document, finalUrl } = await renderUrlDocument(next.url));
+      try {
+        ({ document, finalUrl } = await renderUrlDocument(next.url));
+      } catch (browserError) {
+        console.warn(
+          "Rendered knowledge fallback failed; keeping the static crawl:",
+          next.url,
+          browserError instanceof Error ? browserError.message : browserError,
+        );
+      }
+    }
+
+    if (document.sections.length === 0) {
+      continue;
     }
 
     sections.push(...document.sections);
