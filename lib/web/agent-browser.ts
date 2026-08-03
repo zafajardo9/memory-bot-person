@@ -43,7 +43,7 @@ function sanitizedEnvironment() {
   return environment;
 }
 
-async function runAgentBrowser(args: string[]) {
+async function runAgentBrowser(args: string[], maxBuffer?: number) {
   const binary = agentBrowserBinaryPath();
 
   try {
@@ -53,7 +53,7 @@ async function runAgentBrowser(args: string[]) {
       {
       encoding: "utf8",
       env: sanitizedEnvironment(),
-      maxBuffer: Math.max(webPageContentLimit() * 4, 64_000),
+      maxBuffer: maxBuffer ?? Math.max(webPageContentLimit() * 4, 64_000),
       timeout: EXECUTION_TIMEOUT_MS,
       },
     );
@@ -71,11 +71,15 @@ async function runAgentBrowser(args: string[]) {
   }
 }
 
-export async function readRenderedWebPage(value: string) {
+export async function readRenderedWebPage(
+  value: string,
+  options: { limit?: number } = {},
+) {
   const url = await validatePublicUrl(value);
   const session = `r-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
   const hostname = url.hostname.toLocaleLowerCase();
-  const limit = webPageContentLimit();
+  const limit = options.limit ?? webPageContentLimit();
+  const maxBuffer = Math.max(limit * 4, 64_000);
   // Agent Browser keys its daemon by launch configuration, so every command in
   // the session must repeat the same containment options.
   const commonArgs = [
@@ -91,14 +95,15 @@ export async function readRenderedWebPage(value: string) {
   ];
 
   try {
-    const opened = await runAgentBrowser([
-      ...commonArgs,
-      "open",
-      url.toString(),
-      "--json",
-    ]);
+    const opened = await runAgentBrowser(
+      [...commonArgs, "open", url.toString(), "--json"],
+      maxBuffer,
+    );
     assertAgentBrowserResponse(opened);
-    const output = await runAgentBrowser([...commonArgs, "read", "--json"]);
+    const output = await runAgentBrowser(
+      [...commonArgs, "read", "--json"],
+      maxBuffer,
+    );
     const result = parseAgentBrowserReadResponse(output, limit);
 
     const finalUrl = await validatePublicUrl(result.url || url.toString());
@@ -108,8 +113,10 @@ export async function readRenderedWebPage(value: string) {
 
     return { ...result, url: finalUrl.toString() };
   } finally {
-    await runAgentBrowser([...commonArgs, "close", "--json"]).catch(() => {
-      // The session may already be closed after a launch or timeout failure.
-    });
+    await runAgentBrowser([...commonArgs, "close", "--json"], maxBuffer).catch(
+      () => {
+        // The session may already be closed after a launch or timeout failure.
+      },
+    );
   }
 }

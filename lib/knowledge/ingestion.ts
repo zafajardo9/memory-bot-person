@@ -1,10 +1,13 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { asJson } from "@/db/knowledge-queries";
-import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/lib/generated/prisma/client";
+import { prisma, withTransientRetry } from "@/lib/prisma";
 import { downloadKnowledgeFile } from "@/lib/storage/imagekit";
+import { readRenderedWebPage } from "@/lib/web/agent-browser";
+import { isAgentBrowserEnabled } from "@/lib/web/config";
 
 import { chunkSections } from "./chunking";
 import { isKnowledgeIndexingEnabled } from "./config";
@@ -21,6 +24,39 @@ import type { ExtractedDocument, ExtractedSection } from "./types";
 
 function sha256(value: Uint8Array | string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+const EMBEDDING_CONCURRENCY = 6;
+const VECTOR_UPDATE_BATCH = 100;
+const KNOWLEDGE_BROWSER_CONTENT_LIMIT = 100_000;
+
+/**
+ * Runs `worker` over `items` with at most `concurrency` promises in flight.
+ * Results are returned in input order. Embedding calls are independent network
+ * round-trips — serializing them (the old behavior) multiplied latency by N.
+ */
+async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+
+  async function pump() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await worker(items[index], index);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => pump(),
+  );
+  await Promise.all(workers);
+  return results;
 }
 
 async function extractBytes(bytes: Uint8Array, mimeType: string, sourceUrl?: string) {
@@ -58,20 +94,27 @@ async function extractUrlSource(url: string, crawlDepth: number, crawlLimit: num
     if (visited.has(next.url)) continue;
     visited.add(next.url);
 
-    const fetched = await fetchPublicKnowledgeUrl(next.url);
     let document: ExtractedDocument;
-    if (fetched.contentType === "application/pdf") {
-      document = await extractPdf(fetched.bytes, fetched.url);
-    } else if (["text/plain", "text/markdown"].includes(fetched.contentType)) {
-      document = extractStructuredText(new TextDecoder().decode(fetched.bytes), fetched.url);
-    } else if (fetched.contentType === "text/html") {
-      document = extractWebPage(new TextDecoder().decode(fetched.bytes), fetched.url);
-    } else {
-      throw new Error(`Unsupported linked content type: ${fetched.contentType}`);
+    let finalUrl = next.url;
+    try {
+      ({ document, finalUrl } = await fetchStaticUrlDocument(next.url));
+    } catch (error) {
+      if (!isAgentBrowserEnabled()) throw error;
+      console.warn(
+        "Static URL fetch failed for knowledge source, falling back to Agent Browser:",
+        error instanceof Error ? error.message : error,
+      );
+      ({ document, finalUrl } = await renderUrlDocument(next.url));
+    }
+
+    // Some pages return a valid HTML shell that renders zero text (client-side
+    // JS). Retry with the headless browser when static extraction came up empty.
+    if (document.sections.length === 0 && isAgentBrowserEnabled()) {
+      ({ document, finalUrl } = await renderUrlDocument(next.url));
     }
 
     sections.push(...document.sections);
-    pages.push({ url: fetched.url, title: document.title });
+    pages.push({ url: finalUrl, title: document.title });
 
     if (next.depth < crawlDepth) {
       for (const link of document.discoveredLinks ?? []) {
@@ -83,6 +126,45 @@ async function extractUrlSource(url: string, crawlDepth: number, crawlLimit: num
   }
 
   return { sections, metadata: { pages } } satisfies ExtractedDocument;
+}
+
+/**
+ * Fetches a URL with a plain HTTP request and extracts its text. Fails for
+ * JS-rendered pages whose HTML shell contains no readable content.
+ */
+async function fetchStaticUrlDocument(url: string) {
+  const fetched = await fetchPublicKnowledgeUrl(url);
+  let document: ExtractedDocument;
+  if (fetched.contentType === "application/pdf") {
+    document = await extractPdf(fetched.bytes, fetched.url);
+  } else if (["text/plain", "text/markdown"].includes(fetched.contentType)) {
+    document = extractStructuredText(new TextDecoder().decode(fetched.bytes), fetched.url);
+  } else if (fetched.contentType === "text/html") {
+    document = extractWebPage(new TextDecoder().decode(fetched.bytes), fetched.url);
+  } else {
+    throw new Error(`Unsupported linked content type: ${fetched.contentType}`);
+  }
+  return { document, finalUrl: fetched.url };
+}
+
+/**
+ * Opens the URL in a real headless browser (Agent Browser), waits for
+ * JavaScript to render, and returns the visible text. This is the fallback for
+ * SPAs and client-side-rendered pages that a plain fetch cannot read.
+ */
+async function renderUrlDocument(url: string) {
+  const rendered = await readRenderedWebPage(url, {
+    limit: KNOWLEDGE_BROWSER_CONTENT_LIMIT,
+  });
+  const sections = rendered.content
+    .split(/\n{2,}/)
+    .map((block) => block.replace(/\s+/g, " ").trim())
+    .filter((block) => block.length > 20)
+    .map((block) => ({ content: block, sourceUrl: rendered.url }));
+  return {
+    document: { sections } satisfies ExtractedDocument,
+    finalUrl: rendered.url,
+  };
 }
 
 export async function processKnowledgeJob(jobId: string) {
@@ -178,92 +260,126 @@ export async function processKnowledgeJob(jobId: string) {
       where: { id: jobId },
       data: { stage: "embedding", progress: 35 },
     });
+    // Idempotent re-run: a job re-triggered while PROCESSING (e.g. after a
+    // serverless timeout killed the previous invocation) resumes from scratch
+    // safely because prior chunks are cleared before embedding again.
     await prisma.knowledgeChunk.deleteMany({ where: { versionId: job.versionId } });
 
-    for (let index = 0; index < chunks.length; index += 1) {
-      const chunk = chunks[index];
-      const embedding = await embedKnowledgeDocument(chunk.embeddingText, job.source.title);
-      const created = await prisma.knowledgeChunk.create({
-        data: {
-          versionId: job.versionId,
-          ordinal: index,
-          content: chunk.content,
-          section: chunk.section,
-          pageNumber: chunk.pageNumber,
-          sourceUrl: chunk.sourceUrl,
-          tokenCount: chunk.tokenCount,
-        },
-      });
-      const vector = `[${embedding.join(",")}]`;
-      await prisma.$executeRaw`
-        UPDATE "KnowledgeChunk"
-        SET "embedding" = ${vector}::vector,
-            "searchVector" = to_tsvector('english', ${chunk.content})
-        WHERE "id" = ${created.id}::uuid
-      `;
+    // Embed every chunk with bounded concurrency — embedding calls are
+    // independent network round-trips, so serializing them (the old behavior)
+    // multiplied wall time by the chunk count.
+    let embedded = 0;
+    const embeddings = await mapWithConcurrency(
+      chunks,
+      EMBEDDING_CONCURRENCY,
+      async (chunk) => {
+        const embedding = await embedKnowledgeDocument(
+          chunk.embeddingText,
+          job.source.title,
+        );
+        embedded += 1;
+        if (embedded % 5 === 0 || embedded === chunks.length) {
+          await prisma.knowledgeIngestionJob.update({
+            where: { id: jobId },
+            data: {
+              progress: 35 + Math.round((embedded / chunks.length) * 55),
+            },
+          });
+        }
+        return embedding;
+      },
+    );
 
-      if ((index + 1) % 5 === 0 || index === chunks.length - 1) {
-        await prisma.knowledgeIngestionJob.update({
-          where: { id: jobId },
-          data: { progress: 35 + Math.round(((index + 1) / chunks.length) * 60) },
-        });
-      }
+    // Batch the DB writes: one createMany for all chunks (vectors stay null),
+    // then one raw UPDATE ... FROM (VALUES ...) to set embedding + tsvector
+    // for the whole version instead of ~2N separate round-trips.
+    const chunkIds = chunks.map(() => randomUUID());
+    await prisma.knowledgeChunk.createMany({
+      data: chunks.map((chunk, index) => ({
+        id: chunkIds[index],
+        versionId: job.versionId,
+        ordinal: index,
+        content: chunk.content,
+        section: chunk.section,
+        pageNumber: chunk.pageNumber,
+        sourceUrl: chunk.sourceUrl,
+        tokenCount: chunk.tokenCount,
+      })),
+    });
+
+    const vectorRows = chunks.map((chunk, index) => {
+      const vector = `[${embeddings[index].join(",")}]`;
+      return Prisma.sql`(${chunkIds[index]}::uuid, ${vector}::vector, ${chunk.content}::text)`;
+    });
+    for (let offset = 0; offset < vectorRows.length; offset += VECTOR_UPDATE_BATCH) {
+      const batch = vectorRows.slice(offset, offset + VECTOR_UPDATE_BATCH);
+      await prisma.$executeRaw(Prisma.sql`
+        UPDATE "KnowledgeChunk" AS c
+        SET "embedding" = v.embedding,
+            "searchVector" = to_tsvector('english', v.content)
+        FROM (VALUES ${Prisma.join(batch, ",")}) AS v("id", "embedding", "content")
+        WHERE c."id" = v."id"
+      `);
     }
 
-    await prisma.$transaction(
-      [
-        prisma.knowledgeSourceVersion.update({
-          where: { id: job.versionId },
-          data: {
-            checksum,
-            status: "READY",
-            extractedText,
-            metadata: asJson(document.metadata ?? {}),
-            embeddingModel: KNOWLEDGE_EMBEDDING_MODEL,
-          },
-        }),
-        prisma.knowledgeIngestionJob.update({
-          where: { id: jobId },
-          data: {
-            status: "COMPLETED",
-            stage: "ready_for_approval",
-            progress: 100,
-            completedAt: new Date(),
-          },
-        }),
-        prisma.knowledgeSource.update({
-          where: { id: job.sourceId },
-          data: {
-            status: job.source.currentVersionId ? "APPROVED" : "DRAFT",
-            lastIndexedAt: new Date(),
-          },
-        }),
-      ],
-      { timeout: 30_000 },
+    await withTransientRetry(() =>
+      prisma.$transaction(
+        [
+          prisma.knowledgeSourceVersion.update({
+            where: { id: job.versionId },
+            data: {
+              checksum,
+              status: "READY",
+              extractedText,
+              metadata: asJson(document.metadata ?? {}),
+              embeddingModel: KNOWLEDGE_EMBEDDING_MODEL,
+            },
+          }),
+          prisma.knowledgeIngestionJob.update({
+            where: { id: jobId },
+            data: {
+              status: "COMPLETED",
+              stage: "ready_for_approval",
+              progress: 100,
+              completedAt: new Date(),
+            },
+          }),
+          prisma.knowledgeSource.update({
+            where: { id: job.sourceId },
+            data: {
+              status: job.source.currentVersionId ? "APPROVED" : "DRAFT",
+              lastIndexedAt: new Date(),
+            },
+          }),
+        ],
+        { timeout: 15_000 },
+      ),
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Knowledge ingestion failed";
-    await prisma.$transaction(
-      [
-        prisma.knowledgeIngestionJob.update({
-          where: { id: jobId },
-          data: {
-            status: "FAILED",
-            stage: "failed",
-            errorMessage: message,
-            completedAt: new Date(),
-          },
-        }),
-        prisma.knowledgeSourceVersion.update({
-          where: { id: job.versionId },
-          data: { status: "FAILED", errorMessage: message },
-        }),
-        prisma.knowledgeSource.update({
-          where: { id: job.sourceId },
-          data: { status: job.source.currentVersionId ? "APPROVED" : "FAILED" },
-        }),
-      ],
-      { timeout: 30_000 },
+    await withTransientRetry(() =>
+      prisma.$transaction(
+        [
+          prisma.knowledgeIngestionJob.update({
+            where: { id: jobId },
+            data: {
+              status: "FAILED",
+              stage: "failed",
+              errorMessage: message,
+              completedAt: new Date(),
+            },
+          }),
+          prisma.knowledgeSourceVersion.update({
+            where: { id: job.versionId },
+            data: { status: "FAILED", errorMessage: message },
+          }),
+          prisma.knowledgeSource.update({
+            where: { id: job.sourceId },
+            data: { status: job.source.currentVersionId ? "APPROVED" : "FAILED" },
+          }),
+        ],
+        { timeout: 15_000 },
+      ),
     );
     console.error("Knowledge ingestion failed", { jobId, error: message });
   }

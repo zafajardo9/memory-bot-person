@@ -20,13 +20,13 @@ import React, {
 import { toast } from "sonner";
 
 import { ChatErrorNotice } from "./chat-error-notice";
-import type { ResearchDepth } from "./chat";
 import { ArrowUpIcon, StopIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
 import useWindowSize from "./use-window-size";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 
+import type { ResearchDepth } from "./chat";
 import type { ChatRequestOptions, FileUIPart, UIMessage } from "ai";
 
 const suggestedActions = [
@@ -200,7 +200,7 @@ export function MultimodalInput({
                 onClick={async () => {
                   await sendMessage({ text: suggestedAction.action });
                 }}
-                className="rounded-full border bg-card px-4 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="glass-soft rounded-full px-4 py-1.5 text-sm text-muted-foreground transition-[background-color,color,transform] hover:-translate-y-0.5 hover:bg-primary/[0.08] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 motion-reduce:transition-none"
               >
                 {suggestedAction.title}
               </button>
@@ -227,7 +227,7 @@ export function MultimodalInput({
         tabIndex={-1}
       />
 
-      <div className="overflow-hidden rounded-[20px] border bg-card shadow-[0_8px_30px_hsl(var(--foreground)/0.07)] transition-[border-color,box-shadow] focus-within:border-primary/35 focus-within:shadow-[0_10px_36px_hsl(var(--foreground)/0.1)]">
+      <div className="glass overflow-hidden rounded-[26px] border-border/80 transition-[border-color,box-shadow] duration-200 focus-within:border-primary/35 focus-within:shadow-[0_0_0_3px_hsl(var(--primary)/0.12)] motion-reduce:transition-none dark:border-border">
         {chatError ? (
           <ChatErrorNotice
             error={chatError}
@@ -268,10 +268,6 @@ export function MultimodalInput({
           </div>
         )}
 
-        <div className="border-b border-border/60 px-4 py-1.5">
-          {modelSelector}
-        </div>
-
         <Textarea
           ref={textareaRef}
           placeholder={
@@ -282,7 +278,7 @@ export function MultimodalInput({
           disabled={!aiAvailable}
           value={input}
           onChange={handleInput}
-          className="min-h-16 max-h-[200px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-4 pb-2 pt-4 text-[15px] leading-6 shadow-none focus-visible:border-0 focus-visible:ring-0"
+          className="min-h-16 max-h-[200px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-4 pb-2 pt-4 text-[15px] leading-6 shadow-none focus-visible:border-0 focus-visible:bg-transparent focus-visible:ring-0 dark:bg-transparent dark:focus-visible:bg-transparent"
           rows={2}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
@@ -297,14 +293,17 @@ export function MultimodalInput({
           }}
         />
 
-        <div className="flex min-h-12 items-center gap-2 px-2.5 pb-2.5">
+        <div className="flex min-h-12 flex-wrap items-center gap-1.5 px-2.5 pb-2.5">
+          <div className="min-w-0 max-w-full shrink overflow-hidden">
+            {modelSelector}
+          </div>
           <button
             type="button"
             onClick={() => onThinkingChange(!thinking)}
             className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
               thinking
                 ? "border-primary/25 bg-primary/10 text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
             }`}
             title={thinking ? "Reasoning on" : "Reasoning off"}
             aria-label={thinking ? "Disable reasoning" : "Enable reasoning"}
@@ -320,7 +319,7 @@ export function MultimodalInput({
             className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
               researchDepth === "deep"
                 ? "border-primary/25 bg-primary/10 text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
             }`}
             title={
               researchDepth === "deep"
@@ -380,7 +379,7 @@ export function MultimodalInput({
               <Button
                 type="button"
                 size="icon"
-                className="size-8 rounded-full"
+                className="size-8 rounded-full bg-primary text-primary-foreground shadow-none hover:bg-primary/90"
                 onClick={stop}
                 aria-label="Stop generating"
               >
@@ -390,7 +389,7 @@ export function MultimodalInput({
               <Button
                 type="button"
                 size="icon"
-                className="size-8 rounded-full"
+                className="size-8 rounded-full bg-gradient-to-br from-primary to-sky-500 text-white shadow-none hover:shadow-[0_4px_16px_hsl(var(--primary)/0.35)] active:scale-[0.96]"
                 onClick={submitForm}
                 aria-label="Send message"
                 disabled={
@@ -409,7 +408,7 @@ export function MultimodalInput({
       <div className="flex items-center justify-center gap-3 px-10 text-center text-[10px] text-muted-foreground sm:justify-between sm:px-2 sm:text-left">
         <span>Kairo can make mistakes. Verify important information.</span>
         <span className="hidden shrink-0 sm:inline">
-          <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono">Shift ↵</kbd>{" "}
+          <kbd className="font-mono">Shift ↵</kbd>{" "}
           for a new line
         </span>
       </div>

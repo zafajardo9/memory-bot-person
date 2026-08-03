@@ -74,7 +74,7 @@ export function FollowUpQuestions({
                   setDismissed(true);
                   void onSelect(question);
                 }}
-                className="max-w-full rounded-full border bg-background px-3 py-1.5 text-left text-xs leading-5 text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="glass-soft max-w-full rounded-full px-3 py-1.5 text-left text-xs leading-5 text-muted-foreground transition-colors hover:bg-primary/[0.08] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {question}
               </button>

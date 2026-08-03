@@ -7,11 +7,13 @@ import {
   type FileUIPart,
   type UIMessage,
 } from "ai";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { ArrowDown } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 
 import { Message as PreviewMessage } from "@/components/custom/message";
 import { useScrollToBottom } from "@/components/custom/use-scroll-to-bottom";
 
+import { useRegisterActiveAgent } from "./active-agent-context";
 import { ModelSelector } from "./model-selector";
 import { MultimodalInput } from "./multimodal-input";
 import { Overview } from "./overview";
@@ -29,14 +31,22 @@ export function Chat({
   agentName: string;
   agentId: string;
 }) {
+  useRegisterActiveAgent(agentId);
   const [researchDepth, setResearchDepth] = useState<ResearchDepth>("quick");
-  // Mirror depth in a ref so the (stable) transport body closure always reads
-  // the current value without re-creating the transport on every toggle.
-  const researchDepthRef = useRef<ResearchDepth>(researchDepth);
   const handleResearchDepthChange = useCallback((depth: ResearchDepth) => {
-    researchDepthRef.current = depth;
     setResearchDepth(depth);
   }, []);
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        body: () => ({
+          id,
+          agentId,
+          researchDepth,
+        }),
+      }),
+    [agentId, id, researchDepth],
+  );
 
   const {
     messages,
@@ -49,13 +59,7 @@ export function Chat({
   } = useChat({
     id,
     messages: initialMessages,
-    transport: new DefaultChatTransport({
-      body: () => ({
-        id,
-        agentId,
-        researchDepth: researchDepthRef.current,
-      }),
-    }),
+    transport,
     onFinish: () => {
       window.history.replaceState({}, "", `/chat/${id}`);
     },
@@ -66,8 +70,8 @@ export function Chat({
     setAIAvailable(available);
   }, []);
 
-  const [messagesContainerRef, messagesEndRef] =
-    useScrollToBottom<HTMLDivElement>();
+  const [messagesContainerRef, messagesEndRef, isAtBottom, scrollToBottom] =
+    useScrollToBottom<HTMLDivElement>(initialMessages.length > 0);
 
   const [attachments, setAttachments] = useState<FileUIPart[]>([]);
   const isLoading = status === "submitted" || status === "streaming";
@@ -91,40 +95,54 @@ export function Chat({
       .trim() ?? "";
 
   return (
-    <main className="flex h-dvh flex-row justify-center bg-background pb-4 md:pb-6">
-      <div className="flex w-full flex-col items-center justify-between gap-4">
-        <div
-          ref={messagesContainerRef}
-          className="flex flex-col items-center gap-5 overflow-y-auto scroll-smooth size-full"
-        >
-          {dedupedMessages.length === 0 && <Overview />}
-
-          {dedupedMessages.map((message, index) => (
-            <PreviewMessage
-              key={message.id}
-              chatId={id}
-              message={message}
-              agentName={agentName}
-              userMessage={latestUserMessage}
-              onSelectFollowUp={(question) => sendMessage({ text: question })}
-              showFollowUps={
-                !isLoading &&
-                !error &&
-                index === dedupedMessages.length - 1 &&
-                message.role === "assistant"
-              }
-              isActive={
-                isLoading &&
-                index === dedupedMessages.length - 1 &&
-                message.role === "assistant"
-              }
-            />
-          ))}
-
+    <main className="flex h-dvh flex-row justify-center bg-transparent pb-[max(1rem,env(safe-area-inset-bottom))] pt-16 md:pb-6">
+      <div className="flex w-full flex-col items-center justify-between gap-4 pt-3 sm:pt-4">
+        <div className="relative min-h-0 w-full flex-1">
           <div
-            ref={messagesEndRef}
-            className="shrink-0 min-w-[24px] min-h-[24px]"
-          />
+            ref={messagesContainerRef}
+            className="flex size-full flex-col items-center gap-5 overflow-y-auto scroll-smooth"
+          >
+            {dedupedMessages.length === 0 && <Overview />}
+
+            {dedupedMessages.map((message, index) => (
+              <PreviewMessage
+                key={message.id}
+                chatId={id}
+                message={message}
+                agentName={agentName}
+                userMessage={latestUserMessage}
+                onSelectFollowUp={(question) => sendMessage({ text: question })}
+                showFollowUps={
+                  !isLoading &&
+                  !error &&
+                  index === dedupedMessages.length - 1 &&
+                  message.role === "assistant"
+                }
+                isActive={
+                  isLoading &&
+                  index === dedupedMessages.length - 1 &&
+                  message.role === "assistant"
+                }
+              />
+            ))}
+
+            <div
+              ref={messagesEndRef}
+              className="min-h-[24px] min-w-[24px] shrink-0"
+            />
+          </div>
+
+          {!isAtBottom && dedupedMessages.length > 0 ? (
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="glass-soft absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-foreground transition-[background-color,transform] hover:bg-primary/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+              aria-label="Jump to the latest message"
+            >
+              <ArrowDown size={13} aria-hidden />
+              Jump to latest
+            </button>
+          ) : null}
         </div>
 
         <form className="relative w-[calc(100dvw-24px)] max-w-3xl sm:w-[calc(100dvw-32px)]">

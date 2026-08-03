@@ -69,8 +69,6 @@ export function AIProviderSettings({
 
   return (
     <main className="page-shell overflow-hidden">
-      <div className="pointer-events-none fixed inset-x-0 top-16 -z-0 h-72 bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.09),transparent_62%)]" />
-
       <div className="relative z-10 mx-auto w-full max-w-5xl">
         <Link
           href="/knowledge"
@@ -80,9 +78,9 @@ export function AIProviderSettings({
           Back to notebook
         </Link>
 
-        <header className="mt-8 grid gap-7 border-b pb-8 lg:grid-cols-[1fr_auto] lg:items-end">
+        <header className="mt-8 grid gap-7 pb-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="flex items-start gap-4">
-            <span className="mt-1 flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+            <span className="mt-1 flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
               <SlidersHorizontal size={20} />
             </span>
             <div>
@@ -98,7 +96,7 @@ export function AIProviderSettings({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="glass-soft grid grid-cols-2 overflow-hidden rounded-2xl">
             <div className="min-w-28 px-4 py-3">
               <div className="font-mono text-xl font-semibold tabular-nums">
                 {activeCount}
@@ -139,22 +137,22 @@ export function AIProviderSettings({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search providers…"
-                className="h-10 w-full rounded-lg border bg-card pl-9 pr-3 text-sm shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary"
+                className="glass-soft h-10 w-full rounded-full pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
               />
             </label>
           </div>
 
-          <div className="mt-5 flex gap-1 overflow-x-auto border-b" aria-label="Filter providers">
+          <div className="glass-soft mt-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full p-1" aria-label="Filter providers">
             {filters.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setFilter(item.id)}
                 aria-pressed={filter === item.id}
-                className={`relative flex shrink-0 items-center gap-2 px-3 pb-3 text-sm font-medium transition-colors ${
+                className={`relative flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                   filter === item.id
-                    ? "text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-primary"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-white/80 text-foreground dark:bg-white/[0.08]"
+                    : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
                 }`}
               >
                 {item.label}
@@ -175,7 +173,7 @@ export function AIProviderSettings({
             ))}
 
             {visibleProviders.length === 0 ? (
-              <div className="rounded-xl border border-dashed bg-card/50 px-6 py-12 text-center">
+              <div className="content-surface rounded-3xl border-dashed px-6 py-12 text-center">
                 <p className="font-medium">No providers found</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Try another search or clear the current filter.

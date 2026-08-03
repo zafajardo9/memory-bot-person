@@ -133,9 +133,9 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
   }
 
   return (
-    <main className="min-h-dvh bg-[radial-gradient(ellipse_at_12%_5%,hsl(var(--primary)/0.10),transparent_34rem)] px-4 pb-20 pt-24 sm:px-6 lg:px-8">
+    <main className="min-h-dvh bg-transparent px-4 pb-20 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <header className="grid gap-6 border-b pb-8 md:grid-cols-[1fr_auto] md:items-end">
+        <header className="grid gap-6 pb-8 md:grid-cols-[1fr_auto] md:items-end">
           <div>
             <p className="eyebrow">Agent workspace</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
@@ -162,7 +162,7 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
             return (
               <article
                 key={agent.id}
-                className="group flex min-h-72 flex-col rounded-2xl border bg-card p-5 shadow-sm transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg"
+                className="content-surface group flex min-h-72 flex-col rounded-3xl p-5 transition-[transform,background-color,border-color] hover:-translate-y-0.5 hover:border-primary/20 hover:bg-white/90 dark:hover:bg-white/[0.065] motion-reduce:transition-none"
               >
                 <div className="flex items-start justify-between gap-4">
                   <span
@@ -193,7 +193,7 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
                   {agent.description || "A focused assistant ready for its own mission."}
                 </p>
 
-                <div className="mt-5 grid grid-cols-3 divide-x rounded-xl border bg-muted/20 py-3 text-center">
+                <div className="mt-5 grid grid-cols-3 divide-x divide-border/60 rounded-2xl bg-foreground/[0.03] py-3 text-center">
                   <Metric value={agent._count.chats} label="Chats" />
                   <Metric value={agent._count.memories} label="Memories" />
                   <Metric value={agent._count.knowledgeSources} label="Sources" />

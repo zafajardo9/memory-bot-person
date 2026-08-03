@@ -34,12 +34,12 @@ export default async function KnowledgeGapsPage() {
       </div>
 
       {gaps.length === 0 ? (
-        <p className="rounded-xl border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
+        <p className="content-surface rounded-3xl px-4 py-8 text-center text-sm text-muted-foreground">
           No gaps recorded yet. Zero-result queries and negative feedback will
           appear here.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-xl border">
+        <div className="content-surface overflow-x-auto rounded-3xl">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">

@@ -224,7 +224,7 @@ export default async function ToolsPage() {
 
       <div className="flex flex-col gap-6">
         {toolGroups.map((group) => (
-          <section key={group.title} className="rounded-xl border bg-card p-5">
+          <section key={group.title} className="content-surface rounded-3xl p-5">
             <h2 className="text-sm font-semibold">{group.title}</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">{group.description}</p>
 
@@ -239,7 +239,7 @@ export default async function ToolsPage() {
               {group.tools.map((tool) => (
                 <div
                   key={tool.name}
-                  className="flex items-start gap-3 rounded-lg border bg-muted/30 px-3 py-2.5"
+                  className="flex items-start gap-3 rounded-2xl bg-foreground/[0.03] px-3 py-2.5"
                 >
                   <span className="mt-0.5 shrink-0 text-muted-foreground">{tool.icon}</span>
                   <div className="min-w-0 flex-1">
@@ -259,7 +259,7 @@ export default async function ToolsPage() {
         ))}
       </div>
 
-      <div className="mt-8 rounded-xl border bg-card p-5">
+      <div className="content-surface mt-8 rounded-3xl p-5">
         <h2 className="text-sm font-semibold">Architecture</h2>
         <p className="mt-0.5 text-sm text-muted-foreground">
           All tools are composed in <code className="text-xs">ai/tools/index.ts → createChatTools()</code> and
@@ -268,7 +268,7 @@ export default async function ToolsPage() {
           Groq without any provider-specific code.
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+          <div className="rounded-2xl bg-foreground/[0.03] px-3 py-2.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Provider Registry
             </span>
@@ -279,7 +279,7 @@ export default async function ToolsPage() {
               <code className="text-[11px]">listModels</code>.
             </p>
           </div>
-          <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+          <div className="rounded-2xl bg-foreground/[0.03] px-3 py-2.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Tool Execution
             </span>
@@ -289,7 +289,7 @@ export default async function ToolsPage() {
               <code className="text-[11px]">stepCountIs(10)</code>.
             </p>
           </div>
-          <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+          <div className="rounded-2xl bg-foreground/[0.03] px-3 py-2.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Feature Flags
             </span>
@@ -300,7 +300,7 @@ export default async function ToolsPage() {
               without deleting data.
             </p>
           </div>
-          <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+          <div className="rounded-2xl bg-foreground/[0.03] px-3 py-2.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Preflight Injection
             </span>

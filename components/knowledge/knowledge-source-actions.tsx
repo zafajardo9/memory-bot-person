@@ -65,7 +65,7 @@ export function KnowledgeSourceActions({
     };
 
     return (
-      <form onSubmit={updateNote} className="flex flex-col gap-3 rounded-lg border bg-card p-5">
+      <form onSubmit={updateNote} className="content-surface flex flex-col gap-3 rounded-2xl p-5">
         <div><h2 className="font-medium">Edit note</h2><p className="text-xs text-muted-foreground">Saving creates a new reviewable version. The currently trusted version remains active.</p></div>
         <Textarea name="content" defaultValue={initialContent} className="min-h-56 leading-6" required />
         <div className="flex items-center justify-between gap-2">
@@ -83,7 +83,7 @@ export function KnowledgeSourceActions({
   // URL sources: show retry button when failed, otherwise nothing extra
   if (sourceType === "URL") {
     return (
-      <div className="flex flex-col gap-3 rounded-lg border bg-card p-5">
+      <div className="content-surface flex flex-col gap-3 rounded-2xl p-5">
         <div>
           <h2 className="font-medium">Source actions</h2>
           <p className="text-xs text-muted-foreground">
@@ -123,7 +123,7 @@ export function KnowledgeSourceActions({
   };
 
   return (
-    <form onSubmit={replaceFile} className="flex flex-col gap-3 rounded-lg border bg-card p-5">
+    <form onSubmit={replaceFile} className="content-surface flex flex-col gap-3 rounded-2xl p-5">
       <div>
         <h2 className="font-medium">Replace file</h2>
         <p className="text-xs text-muted-foreground">

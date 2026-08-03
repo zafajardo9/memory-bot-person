@@ -1,6 +1,6 @@
 import "server-only";
 
-import { prisma } from "@/lib/prisma";
+import { prisma, withTransientRetry } from "@/lib/prisma";
 
 const DEFAULT_MAX_SOURCES = 250;
 const DEFAULT_MAX_CONTEXT_TOKENS = 1_000_000;
@@ -26,19 +26,23 @@ export function getKnowledgeLimits() {
 export async function getKnowledgeUsage() {
   const limits = getKnowledgeLimits();
   const [sourceCount, chunks] = await Promise.all([
-    prisma.knowledgeSource.count({
-      where: { status: { not: "ARCHIVED" } },
-    }),
-    prisma.knowledgeChunk.aggregate({
-      where: {
-        version: {
-          status: { in: ["READY", "APPROVED"] },
-          source: { status: { not: "ARCHIVED" } },
+    withTransientRetry(() =>
+      prisma.knowledgeSource.count({
+        where: { status: { not: "ARCHIVED" } },
+      }),
+    ),
+    withTransientRetry(() =>
+      prisma.knowledgeChunk.aggregate({
+        where: {
+          version: {
+            status: { in: ["READY", "APPROVED"] },
+            source: { status: { not: "ARCHIVED" } },
+          },
         },
-      },
-      _count: { id: true },
-      _sum: { tokenCount: true },
-    }),
+        _count: { id: true },
+        _sum: { tokenCount: true },
+      }),
+    ),
   ]);
 
   const contextTokens = chunks._sum.tokenCount ?? 0;
@@ -55,9 +59,11 @@ export async function getKnowledgeUsage() {
 
 export async function assertKnowledgeSourceCapacity() {
   const { maxSources } = getKnowledgeLimits();
-  const sourceCount = await prisma.knowledgeSource.count({
-    where: { status: { not: "ARCHIVED" } },
-  });
+  const sourceCount = await withTransientRetry(() =>
+    prisma.knowledgeSource.count({
+      where: { status: { not: "ARCHIVED" } },
+    }),
+  );
 
   if (sourceCount >= maxSources) {
     throw new Error(

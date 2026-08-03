@@ -2,12 +2,15 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { prisma } from "@/lib/prisma";
+import { prisma, withTransientRetry } from "@/lib/prisma";
 import { isImageKitConfigured, uploadKnowledgeFile } from "@/lib/storage/imagekit";
 
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 export function listKnowledgeSources(agentId?: string) {
+  // Deliberately NOT cached: the UI polls this every 3s to show live job
+  // progress, and an SWR cache would serve a stale snapshot for up to 30s.
+  // Cold-start P6000 timeouts are handled by withTransientRetry at the route.
   return prisma.knowledgeSource.findMany({
     where: agentId ? { agents: { some: { agentId } } } : undefined,
     orderBy: { updatedAt: "desc" },
@@ -62,6 +65,7 @@ export async function createNoteKnowledgeSource(input: {
 }
 
 export function getKnowledgeSource(id: string) {
+  // Not cached: the detail view reflects live version/job state after refreshes.
   return prisma.knowledgeSource.findUnique({
     where: { id },
     include: {
@@ -72,6 +76,14 @@ export function getKnowledgeSource(id: string) {
       },
       jobs: { orderBy: { createdAt: "desc" } },
     },
+  });
+}
+
+/** Minimal id + creator lookup used to authorize bulk operations. */
+export function listKnowledgeSourceOwners(ids: string[]) {
+  return prisma.knowledgeSource.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, createdById: true, status: true },
   });
 }
 
@@ -225,56 +237,144 @@ export async function createRescanJob(
     }
   }
 
-  return prisma.$transaction(async (tx) => {
-    const source = await tx.knowledgeSource.findUnique({
-      where: { id: sourceId },
-      include: { versions: { orderBy: { version: "desc" }, take: 1 } },
-    });
-    if (!source) throw new Error("Knowledge source not found");
-    if (source.status === "ARCHIVED") throw new Error("Archived sources cannot be rescanned");
-
-    const latest = source.versions[0];
-
-    // Carry forward the database bytes when no replacement is provided.
-    if (!replacement && !storageProvider) {
-      originalContent = latest?.originalContent ?? null;
-    }
-
-    // Carry forward ImageKit reference when re-scanning without replacement.
-    if (!replacement && !storageProvider && latest?.storageProvider === "imagekit" && latest?.storageRef) {
-      storageProvider = latest.storageProvider;
-      storageRef = latest.storageRef;
-    }
-
-    const nextVersion = (latest?.version ?? 0) + 1;
-    const version = await tx.knowledgeSourceVersion.create({
-      data: {
-        sourceId,
-        version: nextVersion,
-        checksum: `pending-${randomUUID()}`,
-        originalContent: originalContent as Uint8Array<ArrayBuffer> | null,
-        storageProvider,
-        storageRef,
-      },
-    });
-    const job = await tx.knowledgeIngestionJob.create({
-      data: {
-        sourceId,
-        versionId: version.id,
-        idempotencyKey: `${sourceId}:${nextVersion}`,
-      },
-    });
-    if (replacement) {
-      await tx.knowledgeSource.update({
+  return prisma.$transaction(
+    async (tx) => {
+      const source = await tx.knowledgeSource.findUnique({
         where: { id: sourceId },
-        data: { mimeType: replacement.mimeType },
+        include: { versions: { orderBy: { version: "desc" }, take: 1 } },
       });
-    }
-    await tx.knowledgeAuditEvent.create({
-      data: { actorId, sourceId, action: "source.rescan_queued" },
-    });
-    return { source, version, job };
-  });
+      if (!source) throw new Error("Knowledge source not found");
+      if (source.status === "ARCHIVED") throw new Error("Archived sources cannot be rescanned");
+
+      const latest = source.versions[0];
+
+      // Carry forward the database bytes when no replacement is provided.
+      if (!replacement && !storageProvider) {
+        originalContent = latest?.originalContent ?? null;
+      }
+
+      // Carry forward ImageKit reference when re-scanning without replacement.
+      if (!replacement && !storageProvider && latest?.storageProvider === "imagekit" && latest?.storageRef) {
+        storageProvider = latest.storageProvider;
+        storageRef = latest.storageRef;
+      }
+
+      const nextVersion = (latest?.version ?? 0) + 1;
+      const version = await tx.knowledgeSourceVersion.create({
+        data: {
+          sourceId,
+          version: nextVersion,
+          checksum: `pending-${randomUUID()}`,
+          originalContent: originalContent as Uint8Array<ArrayBuffer> | null,
+          storageProvider,
+          storageRef,
+        },
+      });
+      const job = await tx.knowledgeIngestionJob.create({
+        data: {
+          sourceId,
+          versionId: version.id,
+          idempotencyKey: `${sourceId}:${nextVersion}`,
+        },
+      });
+      if (replacement) {
+        await tx.knowledgeSource.update({
+          where: { id: sourceId },
+          data: { mimeType: replacement.mimeType },
+        });
+      }
+      await tx.knowledgeAuditEvent.create({
+        data: { actorId, sourceId, action: "source.rescan_queued" },
+      });
+      return { source, version, job };
+    },
+    { timeout: 15_000 },
+  );
+}
+
+/**
+ * Queues a fresh scan for many sources at once (bulk refresh). Each source gets
+ * a new version + ingestion job that re-crawls URLs or re-processes the stored
+ * bytes of FILE/NOTE sources. No replacement content is supported here — it's
+ * purely "re-learn what this source currently says".
+ */
+export async function createRescanJobs(
+  sourceIds: string[],
+  actorId: string,
+): Promise<
+  Array<{
+    source: { id: string; title: string };
+    version: { id: string; version: number };
+    job: { id: string };
+  }>
+> {
+  if (sourceIds.length === 0) return [];
+
+  return prisma.$transaction(
+    async (tx) => {
+      const sources = await tx.knowledgeSource.findMany({
+        where: { id: { in: sourceIds } },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          versions: { orderBy: { version: "desc" }, take: 1 },
+        },
+      });
+
+      const byId = new Map(sources.map((source) => [source.id, source]));
+
+      const results: Array<{
+        source: { id: string; title: string };
+        version: { id: string; version: number };
+        job: { id: string };
+      }> = [];
+
+      for (const sourceId of sourceIds) {
+        const source = byId.get(sourceId);
+        if (!source) throw new Error("Knowledge source not found");
+        if (source.status === "ARCHIVED") {
+          throw new Error(`"${source.title}" is archived and cannot be rescanned`);
+        }
+
+        const latest = source.versions[0];
+        const nextVersion = (latest?.version ?? 0) + 1;
+
+        const version = await tx.knowledgeSourceVersion.create({
+          data: {
+            sourceId,
+            version: nextVersion,
+            checksum: `pending-${randomUUID()}`,
+            // Carry forward storage: URL sources re-crawl (no bytes), FILE/NOTE
+            // sources re-process their existing bytes or ImageKit reference.
+            originalContent:
+              (latest?.originalContent ?? null) as Uint8Array<ArrayBuffer> | null,
+            storageProvider: latest?.storageProvider ?? null,
+            storageRef: latest?.storageRef ?? null,
+          },
+        });
+        const job = await tx.knowledgeIngestionJob.create({
+          data: {
+            sourceId,
+            versionId: version.id,
+            idempotencyKey: `${sourceId}:${nextVersion}`,
+          },
+        });
+        await tx.knowledgeAuditEvent.create({
+          data: { actorId, sourceId, action: "source.bulk_rescan_queued" },
+        });
+
+        results.push({
+          source: { id: source.id, title: source.title },
+          version: { id: version.id, version: version.version },
+          job: { id: job.id },
+        });
+      }
+
+      return results;
+    },
+    { timeout: 15_000 },
+  );
 }
 
 export async function approveKnowledgeVersion(sourceId: string, versionId: string, actorId: string) {

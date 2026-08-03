@@ -7,6 +7,7 @@ import {
 } from "@/db/knowledge-queries";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
 import { isKnowledgeManagementEnabled } from "@/lib/knowledge/config";
+import { withTransientRetry } from "@/lib/prisma";
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isKnowledgeManagementEnabled()) return new NextResponse(null, { status: 404 });
@@ -14,7 +15,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const source = await getKnowledgeSource(id);
+  const source = await withTransientRetry(() => getKnowledgeSource(id));
   if (!source) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json({
@@ -30,7 +31,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       versions: source.versions.map((version) => ({
         ...version,
         originalContent: undefined,
-        extractedText: version.extractedText?.slice(0, 2_000),
+        extractedText: version.extractedText?.slice(0, 20_000),
       })),
     },
   });
@@ -43,12 +44,13 @@ export async function PATCH(_: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
 
   try {
-    const source = await getKnowledgeSource(id);
+    const source = await withTransientRetry(() => getKnowledgeSource(id));
     if (!source) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (user.role !== "ADMIN" && source.createdById !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    return NextResponse.json({ source: await archiveKnowledgeSource(id, user.id) });
+    const archived = await archiveKnowledgeSource(id, user.id);
+    return NextResponse.json({ source: archived });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to archive source" },
@@ -64,7 +66,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
 
   try {
-    const source = await getKnowledgeSource(id);
+    const source = await withTransientRetry(() => getKnowledgeSource(id));
     if (!source) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (user.role !== "ADMIN" && source.createdById !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

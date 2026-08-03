@@ -48,15 +48,15 @@ export default function Page() {
 
   return (
     <main className="page-shell flex items-center justify-center">
-      <section className="grid w-full max-w-4xl overflow-hidden border bg-card md:grid-cols-[1.1fr_0.9fr]">
-        <div className="hidden border-r bg-muted/40 p-10 md:flex md:flex-col md:justify-between">
+      <section className="grid w-full max-w-4xl items-stretch gap-8 md:grid-cols-[1.1fr_0.9fr] md:gap-10">
+        <div className="hidden p-4 md:flex md:flex-col md:justify-between md:py-10">
           <p className="eyebrow">Memory / New workspace member</p>
           <div>
             <h1 className="max-w-sm text-4xl font-semibold tracking-[-0.045em]">Start with shared context, not scattered answers.</h1>
             <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">Capture what matters, approve trusted sources, and help the team find the same answer.</p>
           </div>
         </div>
-        <div className="p-6 sm:p-10">
+        <div className="glass rounded-[28px] p-6 sm:p-10">
           <div className="mb-8">
             <p className="eyebrow">Get started</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">Create your account</h2>

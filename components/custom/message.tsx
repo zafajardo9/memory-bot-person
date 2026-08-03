@@ -95,7 +95,7 @@ export const Message = ({
   const copyButton = (
     <button
       onClick={handleCopy}
-      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+      className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] text-muted-foreground opacity-100 transition-[background-color,color,opacity] hover:bg-foreground/[0.05] hover:text-foreground sm:opacity-0 sm:group-hover/message:opacity-100"
       aria-label={copied ? "Copied" : "Copy message"}
     >
       {copied ? <Check size={12} /> : <Copy size={12} />}
@@ -105,7 +105,7 @@ export const Message = ({
 
   return (
     <article
-      className="flex w-full max-w-3xl flex-row gap-3 px-4 first-of-type:pt-24 sm:gap-4 sm:px-0"
+      className="group/message flex w-full max-w-3xl flex-row gap-3 px-4 first-of-type:pt-20 sm:gap-4 sm:px-0"
     >
       <div
         className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
@@ -124,8 +124,8 @@ export const Message = ({
           </div>
         ) : null}
         {!isAssistant && attachments.length > 0 ? (
-          <div className="rounded-xl border bg-muted/45 p-2.5">
-            <div className="mb-2 flex items-center gap-1.5 px-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="rounded-2xl bg-foreground/[0.035] p-2.5">
+            <div className="mb-2 flex items-center gap-1.5 px-0.5 text-xs font-medium text-muted-foreground">
               <Paperclip size={11} />
               {attachments.length === 1 ? "File shared" : "Files shared"}
             </div>
@@ -141,7 +141,7 @@ export const Message = ({
         ) : null}
 
         {!isAssistant && content ? (
-          <div className="relative flex flex-col gap-3 rounded-xl border bg-muted px-4 py-2.5 leading-6 text-foreground before:absolute before:left-[-5px] before:top-[14px] before:size-2 before:rotate-45 before:border-b before:border-l before:border-border before:bg-muted">
+          <div className="flex flex-col gap-3 rounded-[20px] rounded-tr-md bg-primary/[0.07] px-4 py-2.5 leading-6 text-foreground dark:bg-primary/[0.12]">
             <ChatMarkdown>{content}</ChatMarkdown>
           </div>
         ) : null}
@@ -159,21 +159,8 @@ export const Message = ({
         {showAnswer ? (
           <section
             aria-label="Assistant answer"
-            className={
-              reasoning.length > 0 ||
-              toolInvocations.length > 0 ||
-              sources.length > 0
-                ? "border-t pt-3"
-                : ""
-            }
+            className={reasoning.length > 0 || toolInvocations.length > 0 || sources.length > 0 ? "pt-1" : ""}
           >
-            {reasoning.length > 0 ||
-            toolInvocations.length > 0 ||
-            sources.length > 0 ? (
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Answer
-              </div>
-            ) : null}
             <div className="min-w-0 text-foreground">
               <ChatMarkdown streaming={isActive}>{content}</ChatMarkdown>
             </div>
@@ -196,11 +183,11 @@ export const Message = ({
             {copyButton}
             {queryLogId && !isActive ? (
               <>
-                <button
+              <button
                   type="button"
                   onClick={() => handleFeedback(1)}
                   disabled={feedback !== null}
-                  className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] transition-colors ${
+                  className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] opacity-100 transition-[background-color,color,opacity] hover:bg-foreground/[0.05] sm:opacity-0 sm:group-hover/message:opacity-100 ${
                     feedback === 1
                       ? "text-primary"
                       : "text-muted-foreground hover:text-foreground"
@@ -214,7 +201,7 @@ export const Message = ({
                   type="button"
                   onClick={() => handleFeedback(-1)}
                   disabled={feedback !== null}
-                  className={`flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] transition-colors ${
+                  className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] opacity-100 transition-[background-color,color,opacity] hover:bg-foreground/[0.05] sm:opacity-0 sm:group-hover/message:opacity-100 ${
                     feedback === -1
                       ? "text-primary"
                       : "text-muted-foreground hover:text-foreground"

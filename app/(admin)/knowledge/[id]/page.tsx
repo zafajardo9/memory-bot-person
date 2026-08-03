@@ -22,7 +22,7 @@ export default async function KnowledgeSourcePage({
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-6 px-4 pb-16 pt-24 sm:px-6">
-      <header className="border-b pb-6">
+      <header className="pb-6">
         <Link href="/knowledge" className="text-sm font-medium text-primary hover:underline">
           ← Back to notebook
         </Link>
@@ -36,7 +36,7 @@ export default async function KnowledgeSourcePage({
       {canEdit ? <KnowledgeSourceActions sourceId={source.id} sourceType={source.type} sourceStatus={source.status} initialContent={source.versions[0]?.extractedText ?? ""} /> : null}
 
       {source.versions.map((version) => (
-        <section key={version.id} className="rounded-lg border bg-card p-5">
+        <section key={version.id} className="content-surface rounded-3xl p-5">
           <div className="flex items-center justify-between">
             <h2 className="font-medium">Version {version.version}</h2>
             <span className="rounded-md border bg-muted px-2 py-0.5 font-mono text-[10px]">{version.status}</span>

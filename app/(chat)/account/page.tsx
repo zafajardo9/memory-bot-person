@@ -2,7 +2,7 @@
 
 import { Lock, Shield, User } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
 
@@ -30,14 +30,10 @@ export default function AccountPage() {
   );
   const [tab, setTab] = useState<Tab>("profile");
   const [saving, setSaving] = useState(false);
-  const [name, setName] = useState("");
+  const [name, setName] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
-
-  useEffect(() => {
-    if (data?.user.name) setName(data.user.name);
-  }, [data?.user.name]);
 
   const user = data?.user;
   const emailName = user?.email?.split("@")[0] ?? "Account";
@@ -51,7 +47,7 @@ export default function AccountPage() {
       const res = await fetch("/api/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() || null }),
+        body: JSON.stringify({ name: (name ?? user?.name ?? "").trim() || null }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Update failed");
@@ -107,7 +103,7 @@ export default function AccountPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-8 px-4 pb-20 pt-24 sm:px-6">
-      <header className="border-b pb-6">
+      <header className="pb-6">
         <p className="eyebrow">Account settings</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
           Your profile
@@ -118,8 +114,8 @@ export default function AccountPage() {
         </p>
       </header>
 
-      <div className="flex items-center gap-4 rounded-xl border bg-card p-5">
-        <span className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary text-xl font-semibold text-primary-foreground">
+      <div className="glass-soft flex items-center gap-4 rounded-3xl p-5">
+        <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-sky-400 text-xl font-semibold text-white">
           {initial}
         </span>
         <div className="min-w-0">
@@ -132,13 +128,13 @@ export default function AccountPage() {
       </div>
 
       {/* Tabs */}
-      <div className="inline-grid w-full grid-cols-2 rounded-lg border bg-muted/40 p-1 sm:w-fit">
+      <div className="glass-soft inline-grid w-full grid-cols-2 rounded-full p-1 sm:w-fit">
         <button
           type="button"
           onClick={() => setTab("profile")}
-          className={`flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+          className={`flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
             tab === "profile"
-              ? "bg-background text-foreground shadow-sm"
+              ? "bg-white/80 text-foreground dark:bg-white/[0.08]"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -147,9 +143,9 @@ export default function AccountPage() {
         <button
           type="button"
           onClick={() => setTab("security")}
-          className={`flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+          className={`flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
             tab === "security"
-              ? "bg-background text-foreground shadow-sm"
+              ? "bg-white/80 text-foreground dark:bg-white/[0.08]"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -160,7 +156,7 @@ export default function AccountPage() {
       {tab === "profile" ? (
         <form
           onSubmit={handleSave}
-          className="flex flex-col gap-5 rounded-xl border bg-card p-5"
+          className="content-surface flex flex-col gap-5 rounded-3xl p-5"
         >
           <div>
             <h2 className="font-medium">Display name</h2>
@@ -173,7 +169,7 @@ export default function AccountPage() {
             <Label htmlFor="account-name">Name</Label>
             <Input
               id="account-name"
-              value={name}
+              value={name ?? user.name ?? ""}
               onChange={(e) => setName(e.target.value)}
               placeholder={emailName}
               maxLength={100}
@@ -189,7 +185,7 @@ export default function AccountPage() {
       ) : (
         <form
           onSubmit={handlePasswordChange}
-          className="flex flex-col gap-5 rounded-xl border bg-card p-5"
+          className="content-surface flex flex-col gap-5 rounded-3xl p-5"
         >
           <div>
             <h2 className="font-medium">Change password</h2>

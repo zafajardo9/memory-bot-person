@@ -1,18 +1,15 @@
-import { MessageSquareText } from "lucide-react";
 import Link from "next/link";
 
 export function AuthNavbar() {
   return (
-    <header className="fixed inset-x-0 top-0 z-30 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-      <div className="mx-auto flex size-full items-center px-4 sm:px-6">
+    <header className="fixed inset-x-0 top-3 z-30 px-3 sm:px-5">
+      <div className="glass mx-auto flex h-12 w-full max-w-5xl items-center rounded-full px-3">
         <Link
           href="/"
           aria-label="Memory home"
-          className="group flex items-center gap-2.5 rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="group flex items-center gap-2 rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <span className="flex size-8 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
-            <MessageSquareText size={16} />
-          </span>
+          <span className="size-6 rounded-full bg-gradient-to-br from-primary to-sky-400 shadow-[0_3px_14px_hsl(var(--primary)/0.28)] transition-transform group-hover:scale-105" />
           <span className="leading-tight">
             <span className="block text-sm font-semibold tracking-[-0.01em]">
               Memory

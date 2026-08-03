@@ -3,7 +3,6 @@ import {
   ChevronDown,
   LogOut,
   MessageSquarePlus,
-  MessageSquareText,
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
@@ -15,7 +14,8 @@ import Link from "next/link";
 import { auth, signOut } from "@/app/(auth)/auth";
 import { isKnowledgeManagementEnabled } from "@/lib/knowledge/config";
 
-import { History } from "./history";
+import { AgentSelector } from "./agent-selector";
+import { Sessions } from "./history";
 import { NavigationLinks } from "./navigation-links";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "../ui/button";
@@ -60,19 +60,17 @@ export function NavigationBar({
   const initial = accountName.charAt(0).toUpperCase();
 
   return (
-    <header className="fixed inset-x-0 top-0 z-30 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-      <div className="mx-auto flex size-full items-center justify-between gap-3 px-3 sm:px-5">
+    <header className="fixed inset-x-0 top-3 z-30 px-3 sm:px-5">
+      <div className="glass mx-auto flex h-12 w-full max-w-5xl items-center justify-between gap-2 rounded-full px-2 sm:px-3">
         <div className="flex min-w-0 items-center gap-2">
-          <History user={user} />
+          <Sessions user={user} />
 
           <Link
             href="/"
             aria-label="Memory home"
-            className="group flex min-w-0 items-center gap-2.5 rounded-lg p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group flex min-w-0 items-center gap-2 rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
-              <MessageSquareText size={16} />
-            </span>
+            <span className="size-6 shrink-0 rounded-full bg-gradient-to-br from-primary to-sky-400 shadow-[0_3px_14px_hsl(var(--primary)/0.28)] transition-transform group-hover:scale-105" />
             <span className="hidden min-w-0 leading-tight sm:block">
               <span className="block text-sm font-semibold tracking-[-0.01em]">
                 Memory
@@ -85,21 +83,22 @@ export function NavigationBar({
 
           {user ? (
             <>
-              <span className="mx-1 hidden h-6 w-px bg-border sm:block" />
               <NavigationLinks knowledgeEnabled={knowledgeEnabled} />
             </>
           ) : null}
         </div>
 
         {user ? (
-          <DropdownMenu>
+          <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
+            <AgentSelector />
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="group flex h-10 shrink-0 items-center gap-2 rounded-xl border bg-card p-1.5 pr-2 text-left shadow-sm transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex h-9 shrink-0 items-center gap-2 rounded-full p-1 pr-1.5 text-left transition-colors hover:bg-foreground/[0.055] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:pr-2"
                 aria-label="Open account menu"
               >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-sky-400 text-xs font-semibold text-white">
                   {initial}
                 </span>
                 <span className="hidden min-w-0 leading-tight md:block">
@@ -120,10 +119,10 @@ export function NavigationBar({
             <DropdownMenuContent
               align="end"
               sideOffset={8}
-              className="w-72 rounded-xl p-1.5 shadow-xl"
+              className="w-72 p-1.5"
             >
               <DropdownMenuLabel className="flex items-center gap-3 p-2 font-normal">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                   {initial}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -206,7 +205,8 @@ export function NavigationBar({
                 </DropdownMenuItem>
               </form>
             </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenu>
+          </div>
         ) : (
           <Button className="h-9 px-3 font-normal" asChild>
             <Link href="/login">Sign in</Link>

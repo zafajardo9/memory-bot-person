@@ -9,6 +9,11 @@ import {
   validateKnowledgeFile,
   validateKnowledgeFileSignature,
 } from "@/lib/knowledge/validation";
+import { withTransientRetry } from "@/lib/prisma";
+
+// Ingestion runs post-response in `after()`; 60s keeps it under the Hobby plan
+// hard kill while Pro honors up to 300s.
+export const maxDuration = 60;
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!isKnowledgeManagementEnabled()) return new NextResponse(null, { status: 404 });
@@ -18,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     await assertKnowledgeWriteRateLimit(user.id);
     const { id } = await params;
-    const source = await getKnowledgeSource(id);
+    const source = await withTransientRetry(() => getKnowledgeSource(id));
     if (!source) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (user.role !== "ADMIN" && source.createdById !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

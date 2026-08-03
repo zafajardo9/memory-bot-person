@@ -270,7 +270,7 @@ export function AgentSettingsPanel({
   const selectedMood = moodDetails[settings.mood];
 
   return (
-    <main className="min-h-dvh bg-[radial-gradient(circle_at_85%_15%,hsl(var(--primary)/0.08),transparent_28rem)] px-4 pb-20 pt-24 sm:px-6 lg:px-8">
+    <main className="min-h-dvh bg-transparent px-4 pb-20 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
@@ -295,16 +295,16 @@ export function AgentSettingsPanel({
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-6">
-            <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <section className="content-surface overflow-hidden rounded-3xl">
               {/* Tab bar */}
-              <div className="flex border-b">
+              <div className="m-2 flex rounded-full bg-foreground/[0.04] p-1">
                 <button
                   type="button"
                   onClick={() => setActiveTab("voice")}
-                  className={`flex-1 border-b-2 px-5 py-3 text-sm font-medium transition-colors ${
+                  className={`flex-1 rounded-full px-3 py-2.5 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${
                     activeTab === "voice"
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      ? "bg-white/80 text-foreground dark:bg-white/[0.08]"
+                      : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
                   }`}
                 >
                   <MessageCircleMore size={15} className="mr-2 inline" />
@@ -313,10 +313,10 @@ export function AgentSettingsPanel({
                 <button
                   type="button"
                   onClick={() => setActiveTab("tools")}
-                  className={`flex-1 border-b-2 px-5 py-3 text-sm font-medium transition-colors ${
+                  className={`flex-1 rounded-full px-3 py-2.5 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${
                     activeTab === "tools"
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      ? "bg-white/80 text-foreground dark:bg-white/[0.08]"
+                      : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
                   }`}
                 >
                   <Wrench size={15} className="mr-2 inline" />
@@ -325,10 +325,10 @@ export function AgentSettingsPanel({
                 <button
                   type="button"
                   onClick={() => setActiveTab("memories")}
-                  className={`flex-1 border-b-2 px-5 py-3 text-sm font-medium transition-colors ${
+                  className={`flex-1 rounded-full px-3 py-2.5 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${
                     activeTab === "memories"
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
+                      ? "bg-white/80 text-foreground dark:bg-white/[0.08]"
+                      : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
                   }`}
                 >
                   <Brain size={15} className="mr-2 inline" />
@@ -845,10 +845,10 @@ export function AgentSettingsPanel({
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-24">
-            <div className="overflow-hidden rounded-2xl border bg-card shadow-[0_18px_60px_hsl(var(--foreground)/0.08)]">
+            <div className="glass overflow-hidden rounded-3xl">
               <div className="border-b bg-gradient-to-br from-primary/10 via-transparent to-violet-500/10 p-5">
                 <div className="flex items-center gap-3">
-                  <span className="relative flex size-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
+                  <span className="relative flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-primary to-sky-400 text-white">
                     <MessageCircleMore size={20} />
                     <span className="absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-card bg-emerald-500" />
                   </span>
@@ -886,7 +886,7 @@ export function AgentSettingsPanel({
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-card p-5 text-sm">
+            <div className="content-surface rounded-3xl p-5 text-sm">
               <p className="font-medium">How it works</p>
               <ol className="mt-3 space-y-3 text-xs leading-5 text-muted-foreground">
                 <li className="flex gap-2">

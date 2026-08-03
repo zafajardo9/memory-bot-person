@@ -4,6 +4,7 @@ import { z } from "zod";
 import { approveKnowledgeVersion, getKnowledgeSource } from "@/db/knowledge-queries";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
 import { isKnowledgeManagementEnabled } from "@/lib/knowledge/config";
+import { withTransientRetry } from "@/lib/prisma";
 
 const schema = z.object({ versionId: z.string().uuid() });
 
@@ -15,14 +16,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
     const { versionId } = schema.parse(await request.json());
-    const source = await getKnowledgeSource(id);
+    const source = await withTransientRetry(() => getKnowledgeSource(id));
     if (!source) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (user.role !== "ADMIN" && source.createdById !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    return NextResponse.json({
-      source: await approveKnowledgeVersion(id, versionId, user.id),
-    });
+    const approved = await approveKnowledgeVersion(id, versionId, user.id);
+    return NextResponse.json({ source: approved });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to approve version" },

@@ -198,11 +198,11 @@ function WebSearchOutput({ output }: { output: unknown }) {
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="group block border-l-2 border-border py-1 pl-3 transition-colors hover:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group block border-l-2 border-primary/15 py-1 pl-3 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="flex items-start justify-between gap-3">
               <span className="min-w-0">
-                <span className="block truncate text-[11px] font-medium text-sky-700 dark:text-sky-300">
+                <span className="block truncate text-[11px] font-medium text-primary">
                   {domain}
                 </span>
                 <span className="mt-0.5 block text-sm font-medium leading-5 text-foreground">
@@ -211,7 +211,7 @@ function WebSearchOutput({ output }: { output: unknown }) {
               </span>
               <ExternalLink
                 size={13}
-                className="mt-1 shrink-0 text-muted-foreground transition-colors group-hover:text-sky-600"
+                className="mt-1 shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
               />
             </span>
             {content ? (
@@ -240,7 +240,7 @@ function ReadWebPageOutput({ output }: { output: unknown }) {
       href={output.url}
       target="_blank"
       rel="noreferrer"
-      className="mt-2 flex items-center justify-between gap-3 border-l-2 border-border py-1 pl-3 text-sm transition-colors hover:border-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="mt-2 flex items-center justify-between gap-3 border-l-2 border-primary/15 py-1 pl-3 text-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="min-w-0">
         <span className="block truncate font-medium">{domain}</span>
@@ -268,7 +268,7 @@ function GenericOutput({ output }: { output: unknown }) {
           />
         </span>
       </summary>
-      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap border-l-2 border-border py-1 pl-3 font-mono text-[11px] leading-4">
+      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap border-l-2 border-primary/15 py-1 pl-3 font-mono text-[11px] leading-4">
         {JSON.stringify(output, null, 2)}
       </pre>
     </details>
@@ -371,15 +371,15 @@ function ReasoningActivity({ part }: { part: ReasoningUIPart }) {
 
   return (
     <div className="relative pb-4 pl-8 last:pb-0">
-      <span className="absolute left-[9px] top-6 h-[calc(100%-12px)] w-px bg-border last:hidden" />
-      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300">
+      <span className="absolute left-[9px] top-6 h-[calc(100%-12px)] w-px bg-primary/15 last:hidden" />
+      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full bg-primary/10 text-primary">
         <BrainCircuit size={11} />
       </span>
       <details className="group/reasoning" open={isStreaming || undefined}>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <span>{isStreaming ? "Thinking" : "Thought through the request"}</span>
           {isStreaming ? (
-            <LoaderCircle size={12} className="animate-spin text-violet-500" />
+            <LoaderCircle size={12} className="animate-spin text-primary" />
           ) : (
             <ChevronDown
               size={12}
@@ -418,14 +418,14 @@ function ToolActivity({
 
   return (
     <div className="relative pb-4 pl-8 last:pb-0">
-      <span className="absolute left-[9px] top-6 h-[calc(100%-12px)] w-px bg-border last:hidden" />
+      <span className="absolute left-[9px] top-6 h-[calc(100%-12px)] w-px bg-primary/15 last:hidden" />
       <span
         className={`absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full border ${
           state.tone === "error"
             ? "border-destructive/30 bg-destructive/10 text-destructive"
             : state.tone === "done"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-              : "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+              ? "border-primary/10 bg-primary/15 text-primary"
+              : "border-primary/10 bg-primary/10 text-primary"
         }`}
       >
         {state.tone === "error" ? (
@@ -449,10 +449,10 @@ function ToolActivity({
               state.tone === "error"
                 ? "text-destructive"
                 : state.tone === "done"
-                  ? "text-emerald-700 dark:text-emerald-300"
+                  ? "text-primary"
                   : state.tone === "waiting"
                     ? "text-amber-700 dark:text-amber-300"
-                    : "text-sky-700 dark:text-sky-300"
+                    : "text-primary"
             }`}
           >
             {state.tone === "active" ? (
@@ -480,7 +480,7 @@ function SourcesActivity({ sources }: { sources: SourceUrlUIPart[] }) {
 
   return (
     <div className="relative pl-8">
-      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full bg-primary/15 text-primary">
         <Check size={11} />
       </span>
       <div className="text-sm font-medium">Sources ready</div>
@@ -578,9 +578,9 @@ export function AssistantActivity({
       <details className="group/work" open={isActive || undefined}>
         <summary className="flex w-fit cursor-pointer list-none items-center gap-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {isActive ? (
-            <LoaderCircle size={13} className="animate-spin text-sky-500" />
+            <LoaderCircle size={13} className="animate-spin text-primary" />
           ) : (
-            <Check size={13} className="text-emerald-600" />
+            <Check size={13} className="text-primary" />
           )}
           <span>{headerLabel}</span>
           <ChevronDown

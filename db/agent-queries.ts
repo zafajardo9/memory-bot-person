@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAgentSchema, updateAgentSchema } from "@/lib/agents";
-import { prisma } from "@/lib/prisma";
+import { prisma, withTransientRetry } from "@/lib/prisma";
 
 import type { CreateAgentInput, UpdateAgentInput } from "@/lib/agents";
 
@@ -77,21 +77,25 @@ export async function listAgents(userId: string) {
 }
 
 export async function getAgentForUser(agentId: string, userId: string) {
-  return prisma.agent.findFirst({
-    where: { id: agentId, userId },
-    select: { id: true },
-  });
+  return withTransientRetry(() =>
+    prisma.agent.findFirst({
+      where: { id: agentId, userId },
+      select: { id: true },
+    }),
+  );
 }
 
 export async function getAgentForUserDetailed(agentId: string, userId: string) {
-  return prisma.agent.findFirst({
-    where: { id: agentId, userId },
-    include: {
-      _count: {
-        select: { chats: true, memories: true, knowledgeSources: true },
+  return withTransientRetry(() =>
+    prisma.agent.findFirst({
+      where: { id: agentId, userId },
+      include: {
+        _count: {
+          select: { chats: true, memories: true, knowledgeSources: true },
+        },
       },
-    },
-  });
+    }),
+  );
 }
 
 export async function getDefaultAgentForUser(userId: string) {

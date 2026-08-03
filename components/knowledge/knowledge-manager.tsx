@@ -16,6 +16,7 @@ import {
   Library,
   Link2,
   List,
+  ListChecks,
   ListOrdered,
   LoaderCircle,
   NotebookPen,
@@ -30,6 +31,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
@@ -136,7 +138,10 @@ export function KnowledgeManager({
   agentId: string;
   agentName: string;
 }) {
-  const [activeAgentId, setActiveAgentId] = useState(agentId);
+  // The active agent is driven by the URL: this page is rendered per-agent
+  // (server passes the agent from the path/query), so navigating to another
+  // agent updates the URL and this prop — no internal switching state.
+  const activeAgentId = agentId;
   const { data, error, isLoading, mutate } = useSWR<{
     sources: SourceSummary[];
     usage: KnowledgeUsage;
@@ -146,6 +151,8 @@ export function KnowledgeManager({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [query, setQuery] = useState("");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<ComposerTab>("NOTE");
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -166,6 +173,12 @@ export function KnowledgeManager({
   const agents = agentsData?.agents ?? [];
   const activeAgent = agents.find((a) => a.id === activeAgentId);
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
+  const pathname = usePathname();
+  const isAgentRoute = pathname.startsWith("/agents/");
+  const agentHref = (agentId: string) =>
+    isAgentRoute
+      ? `/agents/${agentId}/knowledge`
+      : `/knowledge?agent=${agentId}`;
 
   const agentColorStyles: Record<string, string> = {
     violet: "border-violet-500/25 bg-violet-500/10 text-violet-600 dark:text-violet-300",
@@ -324,6 +337,34 @@ export function KnowledgeManager({
     }
   };
 
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const refreshSelected = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      await mutateSource("/api/knowledge/bulk-rescan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selectedIds] }),
+      });
+      toast.success(
+        `Refresh started for ${selectedIds.size} source${selectedIds.size === 1 ? "" : "s"}.`,
+      );
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      await mutate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Bulk refresh failed");
+    }
+  };
+
   const trustedCount = sources.filter(
     (source) => source.status === "APPROVED",
   ).length;
@@ -335,12 +376,11 @@ export function KnowledgeManager({
   ).length;
 
   return (
-    <main className="min-h-dvh overflow-hidden bg-background">
-      <div className="pointer-events-none fixed inset-x-0 top-16 -z-0 h-72 bg-[radial-gradient(ellipse_at_top_left,hsl(var(--primary)/0.09),transparent_62%)]" />
+    <main className="min-h-dvh overflow-hidden bg-transparent">
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-20 pt-24 sm:px-6 lg:pt-28">
-        <header className="grid gap-7 border-b pb-8 lg:grid-cols-[1fr_auto] lg:items-end">
+        <header className="grid gap-7 pb-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="flex items-start gap-4">
-            <span className="mt-1 flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-sm">
+            <span className="mt-1 flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Library size={20} />
             </span>
             <div className="max-w-2xl">
@@ -377,7 +417,7 @@ export function KnowledgeManager({
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <section
             aria-label="Notebook overview"
-            className="grid grid-cols-2 overflow-hidden rounded-xl border bg-card shadow-sm sm:grid-cols-4"
+            className="content-surface grid grid-cols-2 overflow-hidden rounded-3xl sm:grid-cols-4"
           >
             <Stat value={sources.length} label="All sources" icon={BookOpen} />
             <Stat value={trustedCount} label="Trusted" icon={ShieldCheck} />
@@ -412,7 +452,7 @@ export function KnowledgeManager({
                   type="button"
                   onClick={() => openComposer(item)}
                   disabled={isAtCapacity}
-                  className="group relative rounded-xl border bg-card p-4 text-left shadow-sm transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm sm:p-5"
+                  className="content-surface group relative rounded-3xl p-4 text-left transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-primary/25 hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 sm:p-5 dark:hover:bg-white/[0.065] motion-reduce:transition-none"
                 >
                   <div className="relative z-10 flex items-start gap-4">
                     <span
@@ -440,7 +480,7 @@ export function KnowledgeManager({
         </section>
 
         <section className="min-w-0">
-          <div className="mb-4 flex flex-col gap-4 border-t pt-8 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-4 flex flex-col gap-4 pt-8 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="eyebrow">Source library</p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight">
@@ -477,6 +517,44 @@ export function KnowledgeManager({
                 <option value="ARCHIVED">Archived</option>
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              {selectionMode ? (
+                <>
+                  <span className="text-xs text-muted-foreground">
+                    {selectedIds.size} selected
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedIds(new Set());
+                      setSelectionMode(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => void refreshSelected()}
+                  >
+                    <RefreshCw size={13} />
+                    Refresh selected
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setSelectionMode(true)}
+                >
+                  <ListChecks size={13} />
+                  Select
+                </Button>
+              )}
+            </div>
           </div>
 
           {isLoading ? (
@@ -506,7 +584,7 @@ export function KnowledgeManager({
             </div>
           ) : null}
           {!isLoading && data && filteredSources.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-card px-5 py-12 text-center sm:p-14">
+            <div className="content-surface rounded-3xl border-dashed px-5 py-12 text-center sm:p-14">
               <BookOpen className="mx-auto mb-3 text-muted-foreground" />
               <p className="font-medium">No memories found</p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -525,6 +603,9 @@ export function KnowledgeManager({
                 isAdmin={isAdmin}
                 currentUserId={currentUserId}
                 runAction={runAction}
+                selectionMode={selectionMode}
+                selected={selectedIds.has(source.id)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>
@@ -782,13 +863,10 @@ export function KnowledgeManager({
                 const colorClass = agentColorStyles[agent.color] ?? agentColorStyles.violet;
                 const isSelected = agent.id === activeAgentId;
                 return (
-                  <button
+                  <Link
                     key={agent.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveAgentId(agent.id);
-                      setAgentPickerOpen(false);
-                    }}
+                    href={agentHref(agent.id)}
+                    onClick={() => setAgentPickerOpen(false)}
                     className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-colors ${
                       isSelected
                         ? "border-primary/30 bg-primary/10"
@@ -811,7 +889,7 @@ export function KnowledgeManager({
                         {agent.description || "No description"}
                       </p>
                     </div>
-                  </button>
+                  </Link>
                 );
               })}
             </div>
@@ -953,21 +1031,36 @@ function SourceCard({
   isAdmin,
   currentUserId,
   runAction,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
 }: {
   source: SourceSummary;
   isAdmin: boolean;
   currentUserId: string;
   runAction: (label: string, url: string, init?: RequestInit) => Promise<void>;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const meta = typeMeta[source.type];
   const Icon = meta.icon;
   const latest = source.versions[0];
+  // The newest attempt can be an empty ARCHIVED duplicate (unchanged rescan).
+  // Show stats for the newest version that actually holds learned content
+  // (READY/APPROVED), falling back to the newest attempt.
+  const learnedVersion =
+    source.versions.find(
+      (version) => version.status === "READY" || version.status === "APPROVED",
+    ) ?? source.versions[0];
   const job = source.jobs[0];
+  const activeJob = Boolean(job && ["QUEUED", "PROCESSING"].includes(job.status));
   const readyVersion = source.versions.find(
     (version) => version.status === "READY",
   );
   const canManage = isAdmin || source.createdById === currentUserId;
-  const [expanded, setExpanded] = useState(false);
+  const selectable = canManage && source.status !== "ARCHIVED" && !activeJob;
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [detail, setDetail] = useState<{
     currentVersion?: {
       extractedText?: string | null;
@@ -977,12 +1070,8 @@ function SourceCard({
   } | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  const toggleExpand = useCallback(async () => {
-    if (expanded) {
-      setExpanded(false);
-      return;
-    }
-    setExpanded(true);
+  const openPreview = useCallback(async () => {
+    setPreviewOpen(true);
     if (!detail && !loadingDetail) {
       setLoadingDetail(true);
       try {
@@ -997,16 +1086,21 @@ function SourceCard({
         setLoadingDetail(false);
       }
     }
-  }, [expanded, detail, loadingDetail, source.id]);
+  }, [detail, loadingDetail, source.id]);
+
+  const previewVersion =
+    detail?.currentVersion ??
+    detail?.versions?.find((version) => version.status === "READY") ??
+    null;
 
   const hasContent =
     (source.type === "URL" &&
-      detail?.currentVersion?.metadata?.pages &&
-      detail.currentVersion.metadata.pages.length > 1) ||
-    Boolean(detail?.currentVersion?.extractedText);
+      previewVersion?.metadata?.pages &&
+      previewVersion.metadata.pages.length > 1) ||
+    Boolean(previewVersion?.extractedText);
 
   return (
-    <article className="overflow-hidden rounded-xl border bg-card shadow-sm transition-[border-color,box-shadow] hover:border-primary/30 hover:shadow-md">
+    <article className="content-surface overflow-hidden rounded-3xl transition-[background-color,border-color] hover:border-primary/25 hover:bg-white/90 dark:hover:bg-white/[0.065]">
       <div className="group flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
         <div className="flex items-center justify-between gap-3 sm:self-start">
           <span
@@ -1014,6 +1108,24 @@ function SourceCard({
           >
             <Icon size={18} />
           </span>
+          {selectionMode ? (
+            <button
+              type="button"
+              aria-label={selected ? `Deselect ${source.title}` : `Select ${source.title}`}
+              disabled={!selectable}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (selectable) onToggleSelect?.(source.id);
+              }}
+              className={`flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                selected
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-muted-foreground hover:border-primary/40"
+              } ${!selectable ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
+            >
+              {selected ? <CheckCircle2 size={18} /> : <span className="size-4 rounded-sm border border-border" />}
+            </button>
+          ) : null}
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium sm:hidden ${
               source.status === "APPROVED"
@@ -1037,7 +1149,7 @@ function SourceCard({
           </Link>
           <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">
             {meta.label} · By {source.createdBy.email.split("@")[0]} · v
-            {latest?.version ?? 1} · {latest?._count.chunks ?? 0} passages
+            {learnedVersion?.version ?? 1} · {learnedVersion?._count.chunks ?? 0} passages
           </p>
           <div className="mt-3 flex min-h-6 flex-wrap items-center gap-1.5">
             {source.tags.slice(0, 4).map((tag) => (
@@ -1072,6 +1184,12 @@ function SourceCard({
           {job?.errorMessage || latest?.errorMessage ? (
             <p className="mt-2 text-xs text-destructive">
               {job?.errorMessage ?? latest?.errorMessage}
+            </p>
+          ) : null}
+          {job?.status === "COMPLETED" && job.stage === "unchanged" ? (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CheckCircle2 size={12} />
+              No changes detected — content is already up to date.
             </p>
           ) : null}
         </div>
@@ -1113,20 +1231,29 @@ function SourceCard({
               ) : null}
               {canManage ? (
                 <>
-                  {source.status === "FAILED" ? (
+                  {source.status !== "ARCHIVED" ? (
                     <Button
                       size="sm"
                       variant="outline"
                       className="h-8 gap-1.5 text-xs"
+                      disabled={activeJob}
+                      title={
+                        activeJob
+                          ? "This source is already being learned"
+                          : "Re-crawl links or re-learn the current content"
+                      }
                       onClick={() =>
                         runAction(
-                          "Scan retried — re-crawling source",
+                          source.status === "FAILED"
+                            ? "Scan retried — re-crawling source"
+                            : "Refresh started — re-learning current content",
                           `/api/knowledge/${source.id}/rescan`,
                           { method: "POST" },
                         )
                       }
                     >
-                      <RefreshCw size={12} /> Retry
+                      <RefreshCw size={12} />
+                      {source.status === "FAILED" ? "Retry" : "Refresh"}
                     </Button>
                   ) : null}
                   <Button
@@ -1160,107 +1287,117 @@ function SourceCard({
         </div>
       </div>
 
-      {/* Expand toggle — only show for processed sources */}
+      {/* Read learned content — opens a nearly full-screen dialog */}
       {!job || !["QUEUED", "PROCESSING"].includes(job.status) ? (
-        <>
-          <button
-            type="button"
-            onClick={toggleExpand}
-            className="flex w-full items-center justify-center gap-1.5 border-t bg-muted/30 px-4 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-          >
-            <ChevronDown
-              size={13}
-              className={`transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
-            />
-            {expanded ? "Collapse" : "Preview learned content"}
-          </button>
-
-          {expanded ? (
-            <div className="border-t bg-muted/20 px-4 py-4 sm:px-5">
-              {loadingDetail ? (
-                <div className="space-y-2">
-                  <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
-                  <div className="h-3 w-full animate-pulse rounded bg-muted" />
-                  <div className="h-3 w-4/5 animate-pulse rounded bg-muted" />
-                </div>
-              ) : !hasContent ? (
-                <p className="text-xs text-muted-foreground">
-                  No extracted text available yet for this source.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {/* Crawled pages (URL sources only) */}
-                  {source.type === "URL" &&
-                  detail?.currentVersion?.metadata?.pages &&
-                  detail.currentVersion.metadata.pages.length > 1 ? (
-                    <div>
-                      <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        Crawled {detail.currentVersion.metadata.pages.length} pages
-                      </p>
-                      <div className="max-h-36 overflow-y-auto rounded-lg border bg-background p-2.5">
-                        <ul className="space-y-1">
-                          {detail.currentVersion.metadata.pages.map(
-                            (page, index) => (
-                              <li
-                                key={index}
-                                className="flex items-start gap-2 text-[11px] leading-5"
-                              >
-                                <span className="mt-0.5 shrink-0 font-mono text-[10px] text-muted-foreground">
-                                  {index + 1}.
-                                </span>
-                                <span className="min-w-0 truncate">
-                                  {page.title ? (
-                                    <span className="font-medium">
-                                      {page.title}
-                                    </span>
-                                  ) : null}
-                                  {page.title ? (
-                                    <span className="mx-1 text-muted-foreground">
-                                      ·
-                                    </span>
-                                  ) : null}
-                                  <a
-                                    href={page.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-muted-foreground hover:text-primary hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {page.url}
-                                  </a>
-                                </span>
-                              </li>
-                            ),
-                          )}
-                        </ul>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Extracted text preview */}
-                  {detail?.currentVersion?.extractedText ? (
-                    <div>
-                      <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                        Extracted text
-                      </p>
-                      <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-background p-3 text-[11px] leading-5 text-muted-foreground">
-                        {detail.currentVersion.extractedText}
-                      </pre>
-                    </div>
-                  ) : null}
-
-                  <Link
-                    href={`/knowledge/${source.id}`}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
-                  >
-                    Open full source <ArrowRight size={11} />
-                  </Link>
-                </div>
-              )}
-            </div>
-          ) : null}
-        </>
+        <button
+          type="button"
+          onClick={() => void openPreview()}
+          className="flex w-full items-center justify-center gap-1.5 border-t bg-muted/30 px-4 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        >
+          <BookOpen size={13} />
+          Read learned content
+        </button>
       ) : null}
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="flex h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] w-[calc(100vw-1.5rem)] max-w-6xl flex-col sm:w-[calc(100vw-2rem)]">
+          <DialogHeader className="shrink-0 border-b bg-muted/35 px-5 pb-4 pt-5 sm:px-7">
+            <p className="eyebrow">Learned content</p>
+            <DialogTitle className="pr-12">{source.title}</DialogTitle>
+            <DialogDescription>
+              {meta.label} · v{learnedVersion?.version ?? 1} ·{" "}
+              {learnedVersion?._count.chunks ?? 0} passages
+              {source.status === "APPROVED"
+                ? " · Trusted"
+                : source.status === "DRAFT"
+                  ? " · Needs review"
+                  : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7">
+            {loadingDetail ? (
+              <div className="space-y-3">
+                <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+                <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                <div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
+              </div>
+            ) : !hasContent ? (
+              <p className="text-sm text-muted-foreground">
+                No extracted text available yet for this source.
+              </p>
+            ) : (
+              <div className="space-y-6">
+                {/* Crawled pages (URL sources only) */}
+                {source.type === "URL" &&
+                previewVersion?.metadata?.pages &&
+                previewVersion.metadata.pages.length > 1 ? (
+                  <section>
+                    <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Crawled {previewVersion.metadata.pages.length} pages
+                    </p>
+                    <ol className="space-y-2.5 rounded-lg border bg-background p-3">
+                      {previewVersion.metadata.pages.map((page, index) => (
+                        <li
+                          key={index}
+                          className="flex items-start gap-3 text-sm leading-6"
+                        >
+                          <span className="mt-0.5 shrink-0 font-mono text-xs text-muted-foreground">
+                            {index + 1}.
+                          </span>
+                          <span className="min-w-0">
+                            {page.title ? (
+                              <span className="font-medium">{page.title}</span>
+                            ) : null}
+                            {page.title ? (
+                              <span className="mx-1.5 text-muted-foreground">
+                                ·
+                              </span>
+                            ) : null}
+                            <a
+                              href={page.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="break-all text-muted-foreground hover:text-primary hover:underline"
+                            >
+                              {page.url}
+                            </a>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                ) : null}
+
+                {/* Extracted text */}
+                {previewVersion?.extractedText ? (
+                  <section>
+                    <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Extracted text
+                    </p>
+                    <pre className="max-h-[26rem] overflow-y-auto whitespace-pre-wrap rounded-lg border bg-background p-4 font-sans text-sm leading-7 text-foreground">
+                      {previewVersion.extractedText}
+                    </pre>
+                  </section>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="shrink-0 gap-2 border-t px-5 py-3 sm:px-7">
+            <DialogClose asChild>
+              <Button variant="outline" size="sm">
+                Close
+              </Button>
+            </DialogClose>
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link href={`/knowledge/${source.id}`}>
+                Open full source <ArrowRight size={13} />
+              </Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </article>
   );
 }
@@ -1353,7 +1490,7 @@ function KnowledgeCapacity({
       : "stroke-primary";
 
   return (
-    <aside className="rounded-xl border bg-card p-4 shadow-sm" aria-labelledby="knowledge-capacity-heading">
+    <aside className="content-surface rounded-3xl p-4" aria-labelledby="knowledge-capacity-heading">
       <div className="flex items-center gap-4">
         <div className="relative size-24 shrink-0">
           <svg

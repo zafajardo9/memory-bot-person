@@ -169,8 +169,8 @@ export function ProviderSettingsCard({
 
   return (
     <article
-      className={`overflow-hidden rounded-xl border bg-card shadow-sm transition-[border-color,box-shadow] ${
-        expanded ? "border-primary/30 shadow-md" : "hover:border-foreground/20"
+      className={`content-surface overflow-hidden rounded-3xl transition-[background-color,border-color] ${
+        expanded ? "border-primary/25 bg-white/90 dark:bg-white/[0.065]" : "hover:border-foreground/15"
       }`}
     >
       <button

@@ -23,6 +23,10 @@ import {
   validateKnowledgeFile,
   validateKnowledgeFileSignature,
 } from "@/lib/knowledge/validation";
+import { withTransientRetry } from "@/lib/prisma";
+// Ingestion runs post-response in `after()`; 60s keeps it under the Hobby plan
+// hard kill while Pro honors up to 300s.
+export const maxDuration = 60;
 
 function parseTags(value: FormDataEntryValue | null) {
   if (typeof value !== "string" || !value.trim()) return [];
@@ -43,8 +47,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
     const [sources, usage] = await Promise.all([
-      listKnowledgeSources(agentId),
-      getKnowledgeUsage(),
+      withTransientRetry(() => listKnowledgeSources(agentId)),
+      withTransientRetry(() => getKnowledgeUsage()),
     ]);
     return NextResponse.json({ sources, usage });
   } catch (error) {

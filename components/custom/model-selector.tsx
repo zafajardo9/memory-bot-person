@@ -205,7 +205,7 @@ export function ModelSelector({
             setModelOpen(false);
           }}
           disabled={saving}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-wait"
+          className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-foreground/[0.05] disabled:cursor-wait"
         >
           <Bot size={12} className="shrink-0 text-primary" />
           <span>{activeProvider?.label}</span>
@@ -264,7 +264,7 @@ export function ModelSelector({
         disabled={saving}
         aria-expanded={modelOpen}
         aria-haspopup="dialog"
-        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors hover:bg-muted disabled:cursor-wait"
+        className="flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors hover:bg-foreground/[0.05] disabled:cursor-wait"
       >
         <span className="max-w-[140px] truncate text-muted-foreground">
           {activeModel?.label ?? data.selection.modelId}
@@ -281,7 +281,7 @@ export function ModelSelector({
               role="dialog"
               aria-label={`${activeProvider?.label} models`}
               style={panelPosition}
-              className="fixed z-[100] flex flex-col overflow-hidden rounded-lg border bg-card p-3 shadow-xl"
+              className="glass fixed z-[100] flex flex-col overflow-hidden rounded-2xl p-3 shadow-[0_12px_36px_hsl(var(--foreground)/0.10)]"
             >
               <div className="relative mb-1 shrink-0">
                 <Search
@@ -294,7 +294,7 @@ export function ModelSelector({
                   value={modelSearch}
                   onChange={(event) => setModelSearch(event.target.value)}
                   placeholder={`Search ${activeProvider?.label} models…`}
-                  className="w-full rounded-md border bg-muted/50 py-1.5 pl-7 pr-2 text-xs outline-none transition-colors focus:border-primary/40 focus:bg-muted"
+                  className="w-full rounded-xl border border-black/[0.07] bg-white/50 py-1.5 pl-7 pr-2 text-xs outline-none transition-colors focus:border-primary/30 focus:bg-white/75 dark:border-white/[0.08] dark:bg-white/[0.05]"
                 />
               </div>
 
