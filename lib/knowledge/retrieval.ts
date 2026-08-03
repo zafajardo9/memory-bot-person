@@ -4,6 +4,7 @@ import "server-only";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
+import { resolveKnowledgeEmbeddingEngine } from "./embedding-settings";
 import { embedKnowledgeQuery } from "./embeddings";
 import { assembleHybridResults } from "./ranking";
 import { assertKnowledgeQueryRateLimit } from "./rate-limit";
@@ -48,7 +49,8 @@ export async function searchCompanyKnowledge(input: {
   const startedAt = Date.now();
   await assertKnowledgeQueryRateLimit(input.userId);
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 10);
-  const embedding = await embedKnowledgeQuery(input.query);
+  const embeddingEngine = await resolveKnowledgeEmbeddingEngine();
+  const embedding = await embedKnowledgeQuery(input.query, embeddingEngine);
   const vector = `[${embedding.join(",")}]`;
 
   const baseSelect = Prisma.sql`
@@ -71,6 +73,7 @@ export async function searchCompanyKnowledge(input: {
     WHERE source."status" = 'APPROVED'::"KnowledgeSourceStatus"
       AND version."status" = 'APPROVED'::"KnowledgeVersionStatus"
       AND source."currentVersionId" = version."id"
+      AND version."embeddingModel" = ${embeddingEngine.storageModelId}
       AND chunk."embedding" IS NOT NULL
   `;
 

@@ -1,31 +1,32 @@
 "use client";
 
-import {
-  ArrowLeft,
-  CheckCircle2,
-  KeyRound,
-  LockKeyhole,
-  Search,
-  SlidersHorizontal,
-  Sparkles,
-} from "lucide-react";
+import { ArrowLeft, BrainCircuit, Plug2, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 
-import { ProviderSettingsCard } from "@/components/settings/provider-settings-card";
+import { KnowledgeAISettingsPanel } from "@/components/settings/knowledge-ai-settings";
+import { ProviderDirectory } from "@/components/settings/provider-directory";
 
 import type { AIProviderStatus } from "@/ai/providers/types";
+import type { KnowledgeAISettings } from "@/lib/knowledge/embedding-settings";
 
-type ProviderFilter = "all" | "active" | "setup";
+type SettingsTab = "providers" | "configuration";
+
+const TAB_ORDER: SettingsTab[] = ["providers", "configuration"];
 
 export function AIProviderSettings({
   initialProviders,
+  initialKnowledgeSettings,
 }: {
   initialProviders: AIProviderStatus[];
+  initialKnowledgeSettings: KnowledgeAISettings;
 }) {
   const [providers, setProviders] = useState(initialProviders);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<ProviderFilter>("all");
+  const [tab, setTab] = useState<SettingsTab>("providers");
+  const tabRefs = useRef<Record<SettingsTab, HTMLButtonElement | null>>({
+    providers: null,
+    configuration: null,
+  });
 
   const updateProvider = (provider: AIProviderStatus) => {
     setProviders((current) =>
@@ -40,32 +41,58 @@ export function AIProviderSettings({
     (provider) => provider.configured && provider.enabled,
   ).length;
 
-  const visibleProviders = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+  const knowledgeProviderReady = providers.some(
+    (provider) =>
+      provider.id === initialKnowledgeSettings.selection.providerId &&
+      provider.configured &&
+      provider.enabled,
+  );
 
-    return providers.filter((provider) => {
-      const matchesQuery =
-        !normalizedQuery ||
-        provider.label.toLowerCase().includes(normalizedQuery) ||
-        provider.description.toLowerCase().includes(normalizedQuery);
-      const matchesFilter =
-        filter === "all" ||
-        (filter === "active" && provider.configured && provider.enabled) ||
-        (filter === "setup" && !provider.configured);
-
-      return matchesQuery && matchesFilter;
-    });
-  }, [filter, providers, query]);
-
-  const filters: Array<{ id: ProviderFilter; label: string; count: number }> = [
-    { id: "all", label: "All", count: providers.length },
-    { id: "active", label: "Active", count: activeCount },
+  const tabs: Array<{
+    id: SettingsTab;
+    label: string;
+    description: string;
+    icon: typeof Plug2;
+    attention?: boolean;
+  }> = [
     {
-      id: "setup",
-      label: "Needs setup",
-      count: providers.length - connectedCount,
+      id: "providers",
+      label: "AI providers",
+      description: "Connect keys and manage chat models",
+      icon: Plug2,
+    },
+    {
+      id: "configuration",
+      label: "AI configuration",
+      description: "Workspace-wide model behavior",
+      icon: BrainCircuit,
+      attention: !knowledgeProviderReady,
     },
   ];
+
+  const handleTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    id: SettingsTab,
+  ) => {
+    const index = TAB_ORDER.indexOf(id);
+    let next: SettingsTab | null = null;
+
+    if (event.key === "ArrowRight") {
+      next = TAB_ORDER[(index + 1) % TAB_ORDER.length];
+    } else if (event.key === "ArrowLeft") {
+      next = TAB_ORDER[(index - 1 + TAB_ORDER.length) % TAB_ORDER.length];
+    } else if (event.key === "Home") {
+      next = TAB_ORDER[0];
+    } else if (event.key === "End") {
+      next = TAB_ORDER[TAB_ORDER.length - 1];
+    }
+
+    if (next) {
+      event.preventDefault();
+      setTab(next);
+      tabRefs.current[next]?.focus();
+    }
+  };
 
   return (
     <main className="page-shell overflow-hidden">
@@ -86,12 +113,11 @@ export function AIProviderSettings({
             <div>
               <p className="eyebrow">Workspace controls</p>
               <h1 className="mt-2 text-balance text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-                AI model catalog
+                AI settings
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                Connect the providers your team trusts, then choose which models
-                are available in chat. New providers will appear here as they
-                become supported.
+                Connect the providers your team trusts, then configure which
+                models power chat and knowledge processing.
               </p>
             </div>
           </div>
@@ -112,103 +138,74 @@ export function AIProviderSettings({
           </div>
         </header>
 
-        <section className="mt-7" aria-labelledby="provider-directory-heading">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <Sparkles className="text-primary" size={16} />
-                <h2 id="provider-directory-heading" className="text-base font-semibold">
-                  Provider directory
-                </h2>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {providers.length} {providers.length === 1 ? "integration" : "integrations"} supported
-              </p>
-            </div>
-
-            <label className="relative block w-full sm:w-72">
-              <span className="sr-only">Search providers</span>
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                size={15}
-              />
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search providers…"
-                className="glass-soft h-10 w-full rounded-full pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
-              />
-            </label>
-          </div>
-
-          <div className="glass-soft mt-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full p-1" aria-label="Filter providers">
-            {filters.map((item) => (
+        <div
+          role="tablist"
+          aria-label="AI settings sections"
+          className="glass-soft flex w-fit max-w-full gap-1 overflow-x-auto rounded-2xl p-1.5"
+        >
+          {tabs.map((item) => {
+            const Icon = item.icon;
+            const selected = tab === item.id;
+            return (
               <button
                 key={item.id}
+                ref={(element) => {
+                  tabRefs.current[item.id] = element;
+                }}
                 type="button"
-                onClick={() => setFilter(item.id)}
-                aria-pressed={filter === item.id}
-                className={`relative flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                  filter === item.id
-                    ? "bg-white/80 text-foreground dark:bg-white/[0.08]"
+                role="tab"
+                id={`${item.id}-tab`}
+                aria-selected={selected}
+                aria-controls={`${item.id}-panel`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => setTab(item.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, item.id)}
+                className={`relative flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium shadow-sm transition-colors ${
+                  selected
+                    ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
                 }`}
               >
+                <Icon size={15} />
                 {item.label}
-                <span className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
-                  {item.count}
-                </span>
+                {item.attention ? (
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      selected ? "bg-primary-foreground" : "bg-amber-500"
+                    }`}
+                    aria-hidden="true"
+                  />
+                ) : null}
               </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {tabs.find((item) => item.id === tab)?.description}
+        </p>
 
-          <div className="mt-4 space-y-3">
-            {visibleProviders.map((provider) => (
-              <ProviderSettingsCard
-                key={provider.id}
-                provider={provider}
-                onChange={updateProvider}
-              />
-            ))}
+        <div
+          role="tabpanel"
+          id="providers-panel"
+          aria-labelledby="providers-tab"
+          hidden={tab !== "providers"}
+          className="mt-8"
+        >
+          <ProviderDirectory providers={providers} onChange={updateProvider} />
+        </div>
 
-            {visibleProviders.length === 0 ? (
-              <div className="content-surface rounded-3xl border-dashed px-6 py-12 text-center">
-                <p className="font-medium">No providers found</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Try another search or clear the current filter.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuery("");
-                    setFilter("all");
-                  }}
-                  className="mt-4 text-sm font-medium text-primary hover:underline"
-                >
-                  Show all providers
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <aside className="mt-9 grid gap-4 border-t pt-6 text-sm text-muted-foreground sm:grid-cols-2">
-          <div className="flex gap-3 rounded-lg bg-muted/50 p-4">
-            <LockKeyhole className="mt-0.5 shrink-0 text-primary" size={17} />
-            <p>
-              Site-managed keys are encrypted at rest and are never returned to
-              the browser.
-            </p>
-          </div>
-          <div className="flex gap-3 rounded-lg bg-muted/50 p-4">
-            <KeyRound className="mt-0.5 shrink-0 text-primary" size={17} />
-            <p>
-              Environment credentials remain available as a fallback when no
-              site-managed key exists.
-            </p>
-          </div>
-        </aside>
+        <div
+          role="tabpanel"
+          id="configuration-panel"
+          aria-labelledby="configuration-tab"
+          hidden={tab !== "configuration"}
+          className="mt-8"
+        >
+          <KnowledgeAISettingsPanel
+            initialSettings={initialKnowledgeSettings}
+            providerStatuses={providers}
+          />
+        </div>
       </div>
     </main>
   );

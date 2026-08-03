@@ -1,12 +1,15 @@
-import { GoogleGenAI } from "@google/genai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { embed as createEmbedding } from "ai";
 
-import { getProviderApiKey } from "@/ai/providers/service";
+import { resolveKnowledgeEmbeddingEngine } from "./embedding-settings";
 
-export const KNOWLEDGE_EMBEDDING_MODEL = "gemini-embedding-2";
 export const KNOWLEDGE_EMBEDDING_DIMENSIONS = 768;
 
-let client: GoogleGenAI | undefined;
-let clientKey: string | undefined;
+export type KnowledgeEmbeddingEngine = Awaited<
+  ReturnType<typeof resolveKnowledgeEmbeddingEngine>
+>;
+
 let warnedAboutFallback = false;
 
 function localEmbedding(text: string) {
@@ -23,33 +26,44 @@ function localEmbedding(text: string) {
     vector[position] += hash % 2 === 0 ? 1 : -1;
   }
 
-  const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0)) || 1;
+  const magnitude =
+    Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0)) || 1;
   return vector.map((value) => value / magnitude);
 }
 
-async function getClient() {
-  const apiKey = await getProviderApiKey("google");
-  if (!client || clientKey !== apiKey) {
-    client = new GoogleGenAI({ apiKey });
-    clientKey = apiKey;
+function embeddingModel(engine: KnowledgeEmbeddingEngine) {
+  if (engine.providerId === "openai") {
+    return createOpenAI({ apiKey: engine.apiKey }).embedding(engine.modelId);
   }
-  return client;
+  return createGoogleGenerativeAI({ apiKey: engine.apiKey }).embedding(
+    engine.modelId,
+  );
 }
 
-async function embed(text: string) {
+async function embed(
+  text: string,
+  task: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY",
+  engine: KnowledgeEmbeddingEngine,
+) {
   try {
-    const response = await (await getClient()).models.embedContent({
-      model: KNOWLEDGE_EMBEDDING_MODEL,
-      contents: text,
-      config: { outputDimensionality: KNOWLEDGE_EMBEDDING_DIMENSIONS },
+    const result = await createEmbedding({
+      model: embeddingModel(engine),
+      value: text,
+      providerOptions:
+        engine.providerId === "openai"
+          ? { openai: { dimensions: KNOWLEDGE_EMBEDDING_DIMENSIONS } }
+          : {
+              google: {
+                outputDimensionality: KNOWLEDGE_EMBEDDING_DIMENSIONS,
+                taskType: task,
+              },
+            },
     });
-    const values = response.embeddings?.[0]?.values;
 
-    if (!values || values.length !== KNOWLEDGE_EMBEDDING_DIMENSIONS) {
+    if (result.embedding.length !== KNOWLEDGE_EMBEDDING_DIMENSIONS) {
       throw new Error("The embedding provider returned an invalid vector");
     }
-
-    return values;
+    return result.embedding;
   } catch (error) {
     const allowFallback =
       process.env.KNOWLEDGE_ALLOW_LOCAL_EMBEDDINGS === "true" ||
@@ -58,7 +72,7 @@ async function embed(text: string) {
 
     if (!warnedAboutFallback) {
       console.warn(
-        "Gemini embeddings are unavailable; using the development-only local embedding fallback.",
+        `${engine.providerLabel} embeddings are unavailable; using the development-only local embedding fallback.`,
       );
       warnedAboutFallback = true;
     }
@@ -66,10 +80,25 @@ async function embed(text: string) {
   }
 }
 
-export function embedKnowledgeDocument(text: string, title: string) {
-  return embed(`Represent this approved company knowledge for employee retrieval.\nTitle: ${title}\nContent: ${text}`);
+export function embedKnowledgeDocument(
+  text: string,
+  title: string,
+  engine: KnowledgeEmbeddingEngine,
+) {
+  return embed(
+    `Represent this approved company knowledge for employee retrieval.\nTitle: ${title}\nContent: ${text}`,
+    "RETRIEVAL_DOCUMENT",
+    engine,
+  );
 }
 
-export function embedKnowledgeQuery(query: string) {
-  return embed(`Represent this employee question for retrieving relevant company knowledge.\nQuestion: ${query}`);
+export function embedKnowledgeQuery(
+  query: string,
+  engine: KnowledgeEmbeddingEngine,
+) {
+  return embed(
+    `Represent this employee question for retrieving relevant company knowledge.\nQuestion: ${query}`,
+    "RETRIEVAL_QUERY",
+    engine,
+  );
 }

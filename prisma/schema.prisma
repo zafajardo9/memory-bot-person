@@ -55,6 +55,7 @@ model User {
   knowledgeAudits  KnowledgeAuditEvent[]
   knowledgeQueries KnowledgeQueryLog[]
   providerConfigs  AiProviderConfig[]       @relation("AIProviderConfigUpdater")
+  knowledgeAiConfigs KnowledgeAiConfig[]    @relation("KnowledgeAIConfigUpdater")
   integrationCredentials IntegrationCredential[] @relation("IntegrationCredentialUpdater")
   aiSelection      UserAiSelection?
   agentSettings    UserAgentSettings?
@@ -130,6 +131,18 @@ model AiProviderConfig {
 
   @@index([updatedById])
   @@map("AIProviderConfig")
+}
+
+model KnowledgeAiConfig {
+  id          String   @id @default("workspace") @db.VarChar(30)
+  providerId  String   @db.VarChar(50)
+  modelId     String   @db.VarChar(200)
+  updatedById String   @db.Uuid
+  updatedAt   DateTime @updatedAt
+  updatedBy   User     @relation("KnowledgeAIConfigUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([updatedById])
+  @@map("KnowledgeAIConfig")
 }
 
 model IntegrationCredential {

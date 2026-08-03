@@ -11,7 +11,8 @@ import { isAgentBrowserEnabled } from "@/lib/web/config";
 
 import { chunkSections } from "./chunking";
 import { isKnowledgeIndexingEnabled } from "./config";
-import { embedKnowledgeDocument, KNOWLEDGE_EMBEDDING_MODEL } from "./embeddings";
+import { resolveKnowledgeEmbeddingEngine } from "./embedding-settings";
+import { embedKnowledgeDocument } from "./embeddings";
 import { extractDocx } from "./extractors/docx";
 import { extractPdf } from "./extractors/pdf";
 import { extractStructuredText } from "./extractors/text";
@@ -296,6 +297,7 @@ export async function processKnowledgeJob(jobId: string) {
       where: { id: jobId },
       data: { stage: "embedding", progress: 35 },
     });
+    const embeddingEngine = await resolveKnowledgeEmbeddingEngine();
     // Idempotent re-run: a job re-triggered while PROCESSING (e.g. after a
     // serverless timeout killed the previous invocation) resumes from scratch
     // safely because prior chunks are cleared before embedding again.
@@ -312,6 +314,7 @@ export async function processKnowledgeJob(jobId: string) {
         const embedding = await embedKnowledgeDocument(
           chunk.embeddingText,
           job.source.title,
+          embeddingEngine,
         );
         embedded += 1;
         if (embedded % 5 === 0 || embedded === chunks.length) {
@@ -368,7 +371,7 @@ export async function processKnowledgeJob(jobId: string) {
               status: "READY",
               extractedText,
               metadata: asJson(document.metadata ?? {}),
-              embeddingModel: KNOWLEDGE_EMBEDDING_MODEL,
+              embeddingModel: embeddingEngine.storageModelId,
             },
           }),
           prisma.knowledgeIngestionJob.update({
