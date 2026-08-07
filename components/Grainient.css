@@ -4,3 +4,45 @@
   height: 100%;
   overflow: hidden;
 }
+
+.grainient-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.grainient-background .grainient-container {
+  position: absolute;
+  inset: -3%;
+  width: 106%;
+  height: 106%;
+  opacity: 0.5;
+}
+
+.grainient-background::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(to bottom, hsl(var(--background) / 0.48), transparent 42%),
+    hsl(var(--background) / 0.36);
+}
+
+.dark .grainient-background .grainient-container {
+  opacity: 0.56;
+  filter: brightness(0.68) saturate(0.82);
+}
+
+.dark .grainient-background::after {
+  background:
+    linear-gradient(to bottom, hsl(var(--background) / 0.46), transparent 48%),
+    hsl(var(--background) / 0.38);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grainient-background .grainient-container {
+    opacity: 0.32;
+  }
+}

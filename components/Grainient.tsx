@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+"use client";
+
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
+import React, { useEffect, useRef } from 'react';
 import './Grainient.css';
 
 interface GrainientProps {
@@ -167,12 +169,19 @@ const Grainient: React.FC<GrainientProps> = ({
     const container = containerRef.current;
     if (!container) return;
 
-    const renderer = new Renderer({
-      webgl: 2,
-      alpha: true,
-      antialias: false,
-      dpr: Math.min(window.devicePixelRatio || 1, 2)
-    });
+    const renderer = (() => {
+      try {
+        return new Renderer({
+          webgl: 2,
+          alpha: true,
+          antialias: false,
+          dpr: Math.min(window.devicePixelRatio || 1, 2)
+        });
+      } catch {
+        return null;
+      }
+    })();
+    if (!renderer) return;
 
     const gl = renderer.gl;
     const canvas = gl.canvas as HTMLCanvasElement;
@@ -233,6 +242,8 @@ const Grainient: React.FC<GrainientProps> = ({
     let raf = 0;
     let isVisible = true;
     let isPageVisible = !document.hidden;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let motionAllowed = !reducedMotion.matches;
     const t0 = performance.now();
 
     const loop = (t: number) => {
@@ -242,7 +253,9 @@ const Grainient: React.FC<GrainientProps> = ({
     };
 
     const tryStart = () => {
-      if (isVisible && isPageVisible && raf === 0) raf = requestAnimationFrame(loop);
+      if (isVisible && isPageVisible && motionAllowed && raf === 0) {
+        raf = requestAnimationFrame(loop);
+      }
     };
     const tryStop = () => {
       if (raf !== 0) { cancelAnimationFrame(raf); raf = 0; }
@@ -260,6 +273,17 @@ const Grainient: React.FC<GrainientProps> = ({
     };
     document.addEventListener('visibilitychange', onVisibility);
 
+    const onMotionPreference = (event: MediaQueryListEvent) => {
+      motionAllowed = !event.matches;
+      if (motionAllowed) {
+        tryStart();
+      } else {
+        tryStop();
+        renderer.render({ scene: mesh });
+      }
+    };
+    reducedMotion.addEventListener('change', onMotionPreference);
+
     tryStart();
 
     return () => {
@@ -267,6 +291,7 @@ const Grainient: React.FC<GrainientProps> = ({
       ro.disconnect();
       io.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
+      reducedMotion.removeEventListener('change', onMotionPreference);
       ctxMap.delete(container);
       try { container.removeChild(canvas); } catch { /* ignore */ }
     };
@@ -302,6 +327,7 @@ const Grainient: React.FC<GrainientProps> = ({
     u.uColor1.value         = new Float32Array(hexToRgb(color1));
     u.uColor2.value         = new Float32Array(hexToRgb(color2));
     u.uColor3.value         = new Float32Array(hexToRgb(color3));
+    ctx.renderer.render({ scene: ctx.mesh });
   }, [
     timeSpeed, colorBalance, warpStrength, warpFrequency, warpSpeed,
     warpAmplitude, blendAngle, blendSoftness, rotationAmount, noiseScale,
