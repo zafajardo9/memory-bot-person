@@ -1,0 +1,2 @@
+ALTER TABLE "AIProviderConfig"
+ADD COLUMN "customModelIds" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

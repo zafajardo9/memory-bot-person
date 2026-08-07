@@ -36,6 +36,16 @@ export function AIProviderSettings({
     );
   };
 
+  const addProvider = (provider: AIProviderStatus) => {
+    setProviders((current) => [...current, provider]);
+  };
+
+  const removeProvider = (providerId: string) => {
+    setProviders((current) =>
+      current.filter((provider) => provider.id !== providerId),
+    );
+  };
+
   const connectedCount = providers.filter((provider) => provider.configured).length;
   const activeCount = providers.filter(
     (provider) => provider.configured && provider.enabled,
@@ -191,7 +201,12 @@ export function AIProviderSettings({
           hidden={tab !== "providers"}
           className="mt-8"
         >
-          <ProviderDirectory providers={providers} onChange={updateProvider} />
+          <ProviderDirectory
+            providers={providers}
+            onChange={updateProvider}
+            onCreated={addProvider}
+            onDeleted={removeProvider}
+          />
         </div>
 
         <div

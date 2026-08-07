@@ -2,6 +2,7 @@ import { anthropicProviderAdapter } from "./anthropic";
 import { deepseekProviderAdapter } from "./deepseek";
 import { googleProviderAdapter } from "./google";
 import { groqProviderAdapter } from "./groq";
+import { huggingFaceProviderAdapter } from "./huggingface";
 import { mistralProviderAdapter } from "./mistral";
 import { openAIProviderAdapter } from "./openai";
 import { zhipuProviderAdapter } from "./zhipu";
@@ -15,6 +16,7 @@ const providerAdapters = [
   deepseekProviderAdapter,
   mistralProviderAdapter,
   groqProviderAdapter,
+  huggingFaceProviderAdapter,
   zhipuProviderAdapter,
 ] as const;
 

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isAIProviderId } from "@/ai/providers/registry";
-import { getProviderModels } from "@/ai/providers/service";
+import { getProviderModels, providerExists } from "@/ai/providers/service";
 import { getAuthenticatedUser } from "@/lib/auth/permissions";
 
 export async function GET(
@@ -11,7 +10,7 @@ export async function GET(
   const user = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { providerId } = await params;
-  if (!isAIProviderId(providerId)) {
+  if (!(await providerExists(providerId))) {
     return NextResponse.json({ error: "Unknown AI provider" }, { status: 404 });
   }
   try {

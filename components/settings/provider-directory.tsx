@@ -3,18 +3,23 @@
 import { KeyRound, LockKeyhole, Search, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { CustomProviderDialog } from "@/components/settings/custom-provider-dialog";
 import { ProviderSettingsCard } from "@/components/settings/provider-settings-card";
 
 import type { AIProviderStatus } from "@/ai/providers/types";
 
-type ProviderFilter = "all" | "active" | "setup";
+type ProviderFilter = "all" | "active" | "custom" | "setup";
 
 export function ProviderDirectory({
   providers,
   onChange,
+  onCreated,
+  onDeleted,
 }: {
   providers: AIProviderStatus[];
   onChange: (provider: AIProviderStatus) => void;
+  onCreated: (provider: AIProviderStatus) => void;
+  onDeleted: (providerId: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ProviderFilter>("all");
@@ -35,6 +40,7 @@ export function ProviderDirectory({
       const matchesFilter =
         filter === "all" ||
         (filter === "active" && provider.configured && provider.enabled) ||
+        (filter === "custom" && provider.custom) ||
         (filter === "setup" && !provider.configured);
 
       return matchesQuery && matchesFilter;
@@ -44,6 +50,11 @@ export function ProviderDirectory({
   const filters: Array<{ id: ProviderFilter; label: string; count: number }> = [
     { id: "all", label: "All", count: providers.length },
     { id: "active", label: "Active", count: activeCount },
+    {
+      id: "custom",
+      label: "Custom",
+      count: providers.filter((provider) => provider.custom).length,
+    },
     {
       id: "setup",
       label: "Needs setup",
@@ -67,20 +78,23 @@ export function ProviderDirectory({
             </p>
           </div>
 
-          <label className="relative block w-full sm:w-72">
-            <span className="sr-only">Search providers</span>
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              size={15}
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search providers…"
-              className="glass-soft h-10 w-full rounded-full pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
-            />
-          </label>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <label className="relative block w-full sm:w-64">
+              <span className="sr-only">Search providers</span>
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                size={15}
+              />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search providers…"
+                className="glass-soft h-10 w-full rounded-full pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/30 focus:ring-2 focus:ring-primary/10"
+              />
+            </label>
+            <CustomProviderDialog onCreated={onCreated} />
+          </div>
         </div>
 
         <div className="glass-soft mt-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full p-1" aria-label="Filter providers">
@@ -110,6 +124,7 @@ export function ProviderDirectory({
               key={provider.id}
               provider={provider}
               onChange={onChange}
+              onDelete={onDeleted}
             />
           ))}
 

@@ -5,6 +5,7 @@ export interface AIProviderModel {
   label: string;
   description?: string;
   chatCapable: boolean;
+  custom?: boolean;
   inputTokenLimit?: number;
   outputTokenLimit?: number;
 }
@@ -30,6 +31,9 @@ export interface AIProviderStatus {
   source: AIProviderCredentialSource;
   maskedKey: string | null;
   defaultModelId: string;
+  customModelIds: string[];
+  custom: boolean;
+  baseUrl: string | null;
   updatedAt: string | null;
   updatedBy: string | null;
 }

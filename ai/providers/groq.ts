@@ -2,45 +2,55 @@ import { createGroq } from "@ai-sdk/groq";
 
 import type { AIProviderAdapter, AIProviderModel } from "./types";
 
-async function listGroqModels(_apiKey: string) {
-  // Groq hosts third-party open-weight models on their fast LPU hardware.
-  // Model availability changes regularly; these are the current chat-capable models.
-  const models: AIProviderModel[] = [
-    {
-      id: "meta-llama/llama-4-maverick-17b-128e-instruct",
-      label: "Llama 4 Maverick (17B)",
-      description: "Meta's latest general-purpose model — strong all-around performance on Groq's fast LPU hardware.",
-      chatCapable: true,
-      inputTokenLimit: 131072,
-      outputTokenLimit: 4096,
-    },
-    {
-      id: "meta-llama/llama-4-scout-17b-16e-instruct",
-      label: "Llama 4 Scout (17B)",
-      description: "Long-context variant with up to 10M token context window for document-length tasks.",
-      chatCapable: true,
-      inputTokenLimit: 131072,
-      outputTokenLimit: 4096,
-    },
-    {
-      id: "qwen/qwen-3-235b-a22b",
-      label: "Qwen 3 (235B MoE)",
-      description: "Massive mixture-of-experts model — excellent for reasoning, coding, and multilingual tasks.",
-      chatCapable: true,
-      inputTokenLimit: 131072,
-      outputTokenLimit: 4096,
-    },
-    {
-      id: "deepseek/deepseek-r1-distill-llama-70b",
-      label: "DeepSeek R1 Distill (70B)",
-      description: "Distilled reasoning model — chain-of-thought for complex analysis at high speed.",
-      chatCapable: true,
-      inputTokenLimit: 131072,
-      outputTokenLimit: 4096,
-    },
-  ];
+interface GroqModelResponse {
+  data?: Array<{
+    id?: string;
+    created?: number;
+    owned_by?: string;
+  }>;
+}
 
-  return models;
+const nonChatModelFragments = [
+  "audio",
+  "embed",
+  "image",
+  "tts",
+  "transcribe",
+  "whisper",
+];
+
+export function isGroqChatModel(modelId: string) {
+  const id = modelId.toLowerCase();
+  return !nonChatModelFragments.some((fragment) => id.includes(fragment));
+}
+
+// Groq hosts open-weight models on their fast LPU hardware and changes the
+// catalog regularly, so discover live instead of maintaining a static list.
+async function listGroqModels(apiKey: string) {
+  const response = await fetch("https://api.groq.com/openai/v1/models", {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(15_000),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(
+      [400, 401, 403].includes(response.status)
+        ? "Groq rejected this API key or project access."
+        : `Groq model discovery failed with status ${response.status}.`,
+    );
+  }
+
+  const body = (await response.json()) as GroqModelResponse;
+  return (body.data ?? [])
+    .filter((model): model is { id: string; created?: number; owned_by?: string } =>
+      Boolean(model.id),
+    )
+    .map((model) => ({
+      id: model.id,
+      label: model.id,
+      description: model.owned_by ? `Owned by ${model.owned_by}` : undefined,
+      chatCapable: isGroqChatModel(model.id),
+    }));
 }
 
 export const groqProviderAdapter: AIProviderAdapter = {
@@ -48,7 +58,7 @@ export const groqProviderAdapter: AIProviderAdapter = {
   label: "Groq",
   description: "Ultra-fast inference on LPU hardware — open-weight models at low latency and high throughput.",
   environmentKey: "GROQ_API_KEY",
-  defaultModelId: "meta-llama/llama-4-maverick-17b-128e-instruct",
+  defaultModelId: "openai/gpt-oss-120b",
   createLanguageModel(apiKey, modelId) {
     return createGroq({ apiKey })(modelId);
   },

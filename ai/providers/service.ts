@@ -1,12 +1,22 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { prisma } from "@/lib/prisma";
 
 import { decryptProviderSecret, encryptProviderSecret } from "./crypto";
 import {
+  mergeCustomModels,
+  normalizeCustomModelIds,
+} from "./custom-models";
+import {
   clearProviderModelCache,
   discoverProviderModels,
 } from "./model-cache";
+import {
+  createOpenAICompatibleAdapter,
+  normalizeCompatibleBaseUrl,
+} from "./openai-compatible";
 import {
   getAIProviderAdapter,
   isAIProviderId,
@@ -27,6 +37,22 @@ function normalizeApiKey(apiKey: string) {
   return value;
 }
 
+function normalizeCustomApiKey(apiKey: string) {
+  const value = apiKey.trim();
+  if (!value || value.length > 500 || /\s/.test(value)) {
+    throw new Error("Enter a valid provider API key.");
+  }
+  return value;
+}
+
+function normalizeProviderLabel(label: string) {
+  const value = label.trim();
+  if (value.length < 2 || value.length > 80) {
+    throw new Error("Provider names must be 2–80 characters.");
+  }
+  return value;
+}
+
 function environmentApiKey(providerId: string) {
   const adapter = getAIProviderAdapter(providerId);
   return process.env[adapter.environmentKey]?.trim() || null;
@@ -39,43 +65,81 @@ async function providerConfig(providerId: string) {
   });
 }
 
+function adapterForConfig(
+  providerId: string,
+  config: Awaited<ReturnType<typeof providerConfig>>,
+  overrides?: { label?: string; baseUrl?: string; defaultModelId?: string },
+) {
+  if (!config?.isCustom) return getAIProviderAdapter(providerId);
+  return createOpenAICompatibleAdapter({
+    id: providerId,
+    label: normalizeProviderLabel(overrides?.label ?? config.label ?? ""),
+    baseUrl: normalizeCompatibleBaseUrl(
+      overrides?.baseUrl ?? config.baseUrl ?? "",
+    ),
+    defaultModelId:
+      overrides?.defaultModelId ??
+      config.defaultModelId ??
+      config.customModelIds[0] ??
+      "model",
+  });
+}
+
+export async function providerExists(providerId: string) {
+  if (isAIProviderId(providerId)) return true;
+  return Boolean((await providerConfig(providerId))?.isCustom);
+}
+
 export async function getProviderApiKey(providerId: string) {
   const config = await providerConfig(providerId);
   if (config?.encryptedValue) return decryptProviderSecret(config.encryptedValue);
+  if (config?.isCustom && config.baseUrl) return "";
   const environmentKey = environmentApiKey(providerId);
   if (environmentKey) return environmentKey;
-  throw new Error(`${getAIProviderAdapter(providerId).label} is not configured.`);
+  throw new Error(`${adapterForConfig(providerId, config).label} is not configured.`);
 }
 
 export async function getProviderStatus(
   providerId: string,
 ): Promise<AIProviderStatus> {
-  const adapter = getAIProviderAdapter(providerId);
   const config = await providerConfig(providerId);
-  const environmentKey = environmentApiKey(providerId);
+  const adapter = adapterForConfig(providerId, config);
+  const environmentKey = config?.isCustom ? null : environmentApiKey(providerId);
   const siteKey = config?.encryptedValue
     ? decryptProviderSecret(config.encryptedValue)
     : null;
   const activeKey = siteKey ?? environmentKey;
+  const customConfigured = Boolean(
+    config?.isCustom && config.baseUrl && config.customModelIds.length > 0,
+  );
 
   return {
     id: adapter.id,
     label: adapter.label,
     description: adapter.description,
-    configured: Boolean(activeKey),
+    configured: customConfigured || Boolean(activeKey),
     enabled: config ? config.enabled : Boolean(activeKey),
     source: siteKey ? "SITE" : environmentKey ? "ENVIRONMENT" : "NONE",
     maskedKey: activeKey ? `••••••••${activeKey.slice(-4)}` : null,
     defaultModelId: config?.defaultModelId || adapter.defaultModelId,
+    customModelIds: config?.customModelIds ?? [],
+    custom: config?.isCustom ?? false,
+    baseUrl: config?.baseUrl ?? null,
     updatedAt: config?.updatedAt.toISOString() ?? null,
     updatedBy: config?.updatedBy.email ?? null,
   };
 }
 
-export function listProviderStatuses() {
-  return Promise.all(
-    listAIProviderAdapters().map((provider) => getProviderStatus(provider.id)),
-  );
+export async function listProviderStatuses() {
+  const customProviders = await prisma.aiProviderConfig.findMany({
+    where: { isCustom: true },
+    orderBy: { updatedAt: "desc" },
+    select: { providerId: true },
+  });
+  return Promise.all([
+    ...listAIProviderAdapters().map((provider) => getProviderStatus(provider.id)),
+    ...customProviders.map((provider) => getProviderStatus(provider.providerId)),
+  ]);
 }
 
 export async function getProviderModels(
@@ -87,14 +151,14 @@ export async function getProviderModels(
   if (options.requireEnabled && !status.enabled) {
     throw new Error(`${status.label} is not enabled.`);
   }
-  const adapter = getAIProviderAdapter(providerId);
+  const adapter = adapterForConfig(providerId, await providerConfig(providerId));
   const apiKey = await getProviderApiKey(providerId);
   const models = await discoverProviderModels(
     adapter,
     apiKey,
     options.forceRefresh,
   );
-  return models
+  return mergeCustomModels(models, status.customModelIds)
     .filter((model) => model.chatCapable)
     .sort((left, right) => {
       if (left.id === status.defaultModelId) return -1;
@@ -106,11 +170,20 @@ export async function getProviderModels(
 export async function testProviderConnection(
   providerId: string,
   apiKey?: string,
+  overrides?: { label?: string; baseUrl?: string },
 ) {
-  const adapter = getAIProviderAdapter(providerId);
-  const key = apiKey ? normalizeApiKey(apiKey) : await getProviderApiKey(providerId);
+  const config = await providerConfig(providerId);
+  const adapter = adapterForConfig(providerId, config, overrides);
+  const key = apiKey
+    ? config?.isCustom
+      ? normalizeCustomApiKey(apiKey)
+      : normalizeApiKey(apiKey)
+    : await getProviderApiKey(providerId);
   const models = await discoverProviderModels(adapter, key, true);
-  const chatModels = models.filter((model) => model.chatCapable);
+  const chatModels = mergeCustomModels(
+    models.filter((model) => model.chatCapable),
+    config?.customModelIds ?? [],
+  );
   if (chatModels.length === 0) {
     throw new Error(`${adapter.label} returned no chat-capable models.`);
   }
@@ -122,34 +195,64 @@ export async function saveProviderConfiguration(input: {
   apiKey?: string;
   enabled: boolean;
   defaultModelId?: string;
+  customModelIds?: string[];
+  label?: string;
+  baseUrl?: string;
   updatedById: string;
 }) {
-  if (!isAIProviderId(input.providerId)) {
+  const existing = await providerConfig(input.providerId);
+  if (!isAIProviderId(input.providerId) && !existing?.isCustom) {
     throw new Error("Unsupported AI provider.");
   }
-  const existing = await providerConfig(input.providerId);
   const newKey = input.apiKey?.trim()
-    ? normalizeApiKey(input.apiKey)
+    ? existing?.isCustom
+      ? normalizeCustomApiKey(input.apiKey)
+      : normalizeApiKey(input.apiKey)
     : undefined;
-  const availableKey =
-    newKey ||
+  const availableKey: string | null =
+    newKey ??
     (existing?.encryptedValue
       ? decryptProviderSecret(existing.encryptedValue)
-      : environmentApiKey(input.providerId));
+      : existing?.isCustom
+        ? ""
+        : environmentApiKey(input.providerId));
 
-  if (input.enabled && !availableKey) {
+  if (input.enabled && availableKey === null) {
     throw new Error("Add an API key before enabling this provider.");
   }
 
   let defaultModelId =
     input.defaultModelId?.trim() ||
     existing?.defaultModelId ||
-    getAIProviderAdapter(input.providerId).defaultModelId;
+    adapterForConfig(input.providerId, existing).defaultModelId;
+  const customModelIds = normalizeCustomModelIds(
+    input.customModelIds ?? existing?.customModelIds ?? [],
+  );
+  const label = existing?.isCustom
+    ? normalizeProviderLabel(input.label ?? existing.label ?? "")
+    : null;
+  const baseUrl = existing?.isCustom
+    ? normalizeCompatibleBaseUrl(input.baseUrl ?? existing.baseUrl ?? "")
+    : null;
 
-  if (availableKey && (newKey || input.enabled || input.defaultModelId)) {
-    const adapter = getAIProviderAdapter(input.providerId);
+  if (
+    availableKey !== null &&
+    (existing?.isCustom ||
+      newKey ||
+      input.enabled ||
+      input.defaultModelId ||
+      input.customModelIds)
+  ) {
+    const adapter = adapterForConfig(input.providerId, existing, {
+      label: label ?? undefined,
+      baseUrl: baseUrl ?? undefined,
+      defaultModelId,
+    });
     const models = await discoverProviderModels(adapter, availableKey, true);
-    const chatModels = models.filter((model) => model.chatCapable);
+    const chatModels = mergeCustomModels(
+      models.filter((model) => model.chatCapable),
+      customModelIds,
+    );
     if (chatModels.length === 0) {
       throw new Error(`${adapter.label} returned no chat-capable models.`);
     }
@@ -168,12 +271,16 @@ export async function saveProviderConfiguration(input: {
       encryptedValue: newKey ? encryptProviderSecret(newKey) : null,
       enabled: input.enabled,
       defaultModelId,
+      customModelIds,
       updatedById: input.updatedById,
     },
     update: {
       encryptedValue: newKey ? encryptProviderSecret(newKey) : undefined,
       enabled: input.enabled,
       defaultModelId,
+      customModelIds,
+      label: label ?? undefined,
+      baseUrl: baseUrl ?? undefined,
       updatedById: input.updatedById,
     },
   });
@@ -193,12 +300,68 @@ export async function removeSiteProviderKey(
       encryptedValue: null,
       enabled: false,
       defaultModelId: adapter.defaultModelId,
+      customModelIds: [],
       updatedById,
     },
     update: { encryptedValue: null, enabled: false, updatedById },
   });
   clearProviderModelCache(providerId);
   return getProviderStatus(providerId);
+}
+
+export async function createCustomProvider(input: {
+  label: string;
+  baseUrl: string;
+  apiKey?: string;
+  modelIds: string[];
+  updatedById: string;
+}) {
+  const label = normalizeProviderLabel(input.label);
+  const baseUrl = normalizeCompatibleBaseUrl(input.baseUrl);
+  const customModelIds = normalizeCustomModelIds(input.modelIds);
+  if (customModelIds.length === 0) {
+    throw new Error("Add at least one chat model ID.");
+  }
+  const apiKey = input.apiKey?.trim()
+    ? normalizeCustomApiKey(input.apiKey)
+    : "";
+  const providerId = `custom-${randomUUID().slice(0, 12)}`;
+  const adapter = createOpenAICompatibleAdapter({
+    id: providerId,
+    label,
+    baseUrl,
+    defaultModelId: customModelIds[0],
+  });
+  await adapter.listModels(apiKey);
+
+  await prisma.aiProviderConfig.create({
+    data: {
+      providerId,
+      encryptedValue: apiKey ? encryptProviderSecret(apiKey) : null,
+      enabled: true,
+      defaultModelId: customModelIds[0],
+      customModelIds,
+      isCustom: true,
+      label,
+      baseUrl,
+      updatedById: input.updatedById,
+    },
+  });
+  return getProviderStatus(providerId);
+}
+
+export async function deleteCustomProvider(providerId: string) {
+  const config = await providerConfig(providerId);
+  if (!config?.isCustom) throw new Error("Only custom providers can be deleted.");
+  await prisma.$transaction([
+    prisma.userAiSelection.deleteMany({ where: { providerId } }),
+    prisma.agent.updateMany({
+      where: { providerId },
+      data: { providerId: null, modelId: null },
+    }),
+    prisma.aiProviderConfig.delete({ where: { providerId } }),
+  ]);
+  clearProviderModelCache(providerId);
 }
 
 function modelInCatalog(
@@ -252,7 +415,7 @@ export async function getAIProviderCatalog(
   const stored = await prisma.userAiSelection.findUnique({ where: { userId } });
   let selection = stored
     ? { providerId: stored.providerId, modelId: stored.modelId }
-      : null;
+    : null;
   if (agent?.providerId && agent.modelId) {
     selection = { providerId: agent.providerId, modelId: agent.modelId };
   }
@@ -289,7 +452,7 @@ export async function saveUserAISelection(
   selection: AISelection,
   agentId?: string,
 ) {
-  if (!isAIProviderId(selection.providerId)) {
+  if (!(await providerExists(selection.providerId))) {
     throw new Error("Unsupported AI provider.");
   }
   const status = await getProviderStatus(selection.providerId);
@@ -325,7 +488,10 @@ export async function resolveUserLanguageModel(userId: string, agentId?: string)
       "No AI provider is available. An administrator must configure and enable one.",
     );
   }
-  const adapter = getAIProviderAdapter(catalog.selection.providerId);
+  const adapter = adapterForConfig(
+    catalog.selection.providerId,
+    await providerConfig(catalog.selection.providerId),
+  );
   const apiKey = await getProviderApiKey(adapter.id);
   return {
     ...catalog.selection,

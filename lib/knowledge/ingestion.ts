@@ -11,8 +11,11 @@ import { isAgentBrowserEnabled } from "@/lib/web/config";
 
 import { chunkSections } from "./chunking";
 import { isKnowledgeIndexingEnabled } from "./config";
-import { resolveKnowledgeEmbeddingEngine } from "./embedding-settings";
-import { embedKnowledgeDocument } from "./embeddings";
+import { resolveKnowledgeEmbeddingEngines } from "./embedding-settings";
+import {
+  embedKnowledgeDocument,
+  pickKnowledgeEmbeddingEngine,
+} from "./embeddings";
 import { extractDocx } from "./extractors/docx";
 import { extractPdf } from "./extractors/pdf";
 import { extractStructuredText } from "./extractors/text";
@@ -297,7 +300,15 @@ export async function processKnowledgeJob(jobId: string) {
       where: { id: jobId },
       data: { stage: "embedding", progress: 35 },
     });
-    const embeddingEngine = await resolveKnowledgeEmbeddingEngine();
+    const embeddingEngines = await resolveKnowledgeEmbeddingEngines();
+    // Pick one provider for the whole job so every vector stays in the same
+    // space; falls back to other configured providers when the active one is
+    // rate-limited or unavailable.
+    const selectedEngine = await pickKnowledgeEmbeddingEngine(
+      embeddingEngines,
+      chunks[0].embeddingText,
+      "RETRIEVAL_DOCUMENT",
+    );
     // Idempotent re-run: a job re-triggered while PROCESSING (e.g. after a
     // serverless timeout killed the previous invocation) resumes from scratch
     // safely because prior chunks are cleared before embedding again.
@@ -310,12 +321,16 @@ export async function processKnowledgeJob(jobId: string) {
     const embeddings = await mapWithConcurrency(
       chunks,
       EMBEDDING_CONCURRENCY,
-      async (chunk) => {
-        const embedding = await embedKnowledgeDocument(
-          chunk.embeddingText,
-          job.source.title,
-          embeddingEngine,
-        );
+      async (chunk, index) => {
+        const embedding = selectedEngine
+          ? index === 0
+            ? selectedEngine.embedding
+            : await embedKnowledgeDocument(chunk.embeddingText, job.source.title, [
+                selectedEngine.engine,
+              ])
+          : // Every provider failed — the empty list routes to the dev-only
+            // local fallback (or throws in production).
+            await embedKnowledgeDocument(chunk.embeddingText, job.source.title, []);
         embedded += 1;
         if (embedded % 5 === 0 || embedded === chunks.length) {
           await prisma.knowledgeIngestionJob.update({
@@ -371,7 +386,7 @@ export async function processKnowledgeJob(jobId: string) {
               status: "READY",
               extractedText,
               metadata: asJson(document.metadata ?? {}),
-              embeddingModel: embeddingEngine.storageModelId,
+              embeddingModel: selectedEngine?.engine.storageModelId ?? null,
             },
           }),
           prisma.knowledgeIngestionJob.update({

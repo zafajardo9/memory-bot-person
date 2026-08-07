@@ -8,7 +8,7 @@ import {
 } from "@/lib/knowledge/embedding-settings";
 
 const knowledgeSelectionSchema = z.object({
-  providerId: z.enum(["google", "openai"]),
+  providerId: z.enum(["google", "openai", "huggingface"]),
   modelId: z.string().trim().min(1).max(200),
 });
 
@@ -35,14 +35,12 @@ export async function PUT(request: Request) {
       await saveKnowledgeAISelection(selection, user.id),
     );
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to save knowledge processing settings.",
-      },
-      { status: 400 },
-    );
+    const message =
+      error instanceof z.ZodError
+        ? error.issues.map((issue) => issue.message).join(", ")
+        : error instanceof Error
+          ? error.message
+          : "Unable to save knowledge processing settings.";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

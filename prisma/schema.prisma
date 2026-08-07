@@ -125,6 +125,10 @@ model AiProviderConfig {
   encryptedValue String?  @db.Text
   enabled        Boolean  @default(false)
   defaultModelId String?  @db.VarChar(200)
+  customModelIds String[] @default([])
+  isCustom       Boolean  @default(false)
+  label          String?  @db.VarChar(80)
+  baseUrl        String?  @db.VarChar(500)
   updatedById    String   @db.Uuid
   updatedAt      DateTime @updatedAt
   updatedBy      User     @relation("AIProviderConfigUpdater", fields: [updatedById], references: [id], onDelete: Restrict)

@@ -14,7 +14,7 @@ export interface KnowledgeEmbeddingModelOption {
 }
 
 export interface KnowledgeEmbeddingProviderOption {
-  id: "google" | "openai";
+  id: "google" | "openai" | "huggingface";
   label: string;
   configured: boolean;
   enabled: boolean;
@@ -24,6 +24,15 @@ export interface KnowledgeEmbeddingProviderOption {
 export interface KnowledgeEmbeddingSelection {
   providerId: KnowledgeEmbeddingProviderOption["id"];
   modelId: string;
+}
+
+/** A resolved, ready-to-use embedding engine for one provider. */
+export interface KnowledgeEmbeddingEngine {
+  providerId: "google" | "openai" | "huggingface";
+  modelId: string;
+  providerLabel: string;
+  storageModelId: string;
+  apiKey: string;
 }
 
 export interface KnowledgeAISettings {
@@ -72,6 +81,26 @@ const providerDefinitions: Array<
         label: "Text Embedding 3 Large",
         description: "Higher-capability retrieval with a higher indexing cost.",
         storageModelId: "openai:text-embedding-3-large",
+      },
+    ],
+  },
+  {
+    id: "huggingface",
+    label: "Hugging Face",
+    models: [
+      {
+        id: "sentence-transformers/multi-qa-mpnet-base-dot-v1",
+        label: "Multi-QA MPNet (768d)",
+        description:
+          "Trained on 215M question-answer pairs for semantic search — ideal for company knowledge retrieval.",
+        storageModelId:
+          "huggingface:sentence-transformers/multi-qa-mpnet-base-dot-v1",
+      },
+      {
+        id: "sentence-transformers/all-mpnet-base-v2",
+        label: "All MPNet Base v2 (768d)",
+        description: "General-purpose sentence embeddings with strong all-around quality.",
+        storageModelId: "huggingface:sentence-transformers/all-mpnet-base-v2",
       },
     ],
   },
@@ -174,4 +203,37 @@ export async function resolveKnowledgeEmbeddingEngine() {
     storageModelId: model.storageModelId,
     apiKey: await getProviderApiKey(provider.id),
   };
+}
+
+/**
+ * Resolves the active embedding engine plus every other connected and enabled
+ * embedding provider, so knowledge processing can fail over automatically when
+ * the active provider is rate-limited or unavailable.
+ */
+export async function resolveKnowledgeEmbeddingEngines(): Promise<
+  KnowledgeEmbeddingEngine[]
+> {
+  const active = await resolveKnowledgeEmbeddingEngine();
+  const settings = await getKnowledgeAISettings();
+  const alternates: KnowledgeEmbeddingEngine[] = [];
+
+  for (const provider of settings.providers) {
+    if (provider.id === active.providerId) continue;
+    if (!provider.configured || !provider.enabled) continue;
+    const model = provider.models[0];
+    if (!model) continue;
+    try {
+      alternates.push({
+        providerId: provider.id,
+        modelId: model.id,
+        providerLabel: provider.label,
+        storageModelId: model.storageModelId,
+        apiKey: await getProviderApiKey(provider.id),
+      });
+    } catch {
+      // Skip providers whose key cannot be resolved at this moment.
+    }
+  }
+
+  return [active, ...alternates];
 }
