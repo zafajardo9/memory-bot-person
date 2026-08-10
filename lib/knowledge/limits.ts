@@ -2,24 +2,25 @@ import "server-only";
 
 import { prisma, withTransientRetry } from "@/lib/prisma";
 
-const DEFAULT_MAX_SOURCES = 250;
-const DEFAULT_MAX_CONTEXT_TOKENS = 1_000_000;
-
-function positiveInteger(value: string | undefined, fallback: number) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+// Knowledge is unlimited by default. Set KNOWLEDGE_MAX_SOURCES /
+// KNOWLEDGE_MAX_CONTEXT_TOKENS to a positive integer to impose an explicit cap,
+// or "0"/"unlimited"/"none" to keep (or restore) the unlimited behavior.
+function parseLimit(
+  value: string | undefined,
+): number | null {
+  if (value === undefined || value.trim() === "") return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "0" || normalized === "unlimited" || normalized === "none") {
+    return null;
+  }
+  const parsed = Number(normalized);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 export function getKnowledgeLimits() {
   return {
-    maxSources: positiveInteger(
-      process.env.KNOWLEDGE_MAX_SOURCES,
-      DEFAULT_MAX_SOURCES,
-    ),
-    maxContextTokens: positiveInteger(
-      process.env.KNOWLEDGE_MAX_CONTEXT_TOKENS,
-      DEFAULT_MAX_CONTEXT_TOKENS,
-    ),
+    maxSources: parseLimit(process.env.KNOWLEDGE_MAX_SOURCES),
+    maxContextTokens: parseLimit(process.env.KNOWLEDGE_MAX_CONTEXT_TOKENS),
   };
 }
 
@@ -45,12 +46,14 @@ export async function getKnowledgeUsage() {
     ),
   ]);
 
-  const contextTokens = chunks._sum.tokenCount ?? 0;
+  const indexedTokens = chunks._sum.tokenCount ?? 0;
 
   return {
     sources: { used: sourceCount, limit: limits.maxSources },
     contextTokens: {
-      used: contextTokens,
+      // Retain the API field name for compatibility. These are tokens stored
+      // in the index, not tokens loaded into a model prompt.
+      used: indexedTokens,
       limit: limits.maxContextTokens,
     },
     passages: chunks._count.id,
@@ -59,6 +62,8 @@ export async function getKnowledgeUsage() {
 
 export async function assertKnowledgeSourceCapacity() {
   const { maxSources } = getKnowledgeLimits();
+  if (maxSources === null) return; // unlimited
+
   const sourceCount = await withTransientRetry(() =>
     prisma.knowledgeSource.count({
       where: { status: { not: "ARCHIVED" } },
@@ -77,6 +82,8 @@ export async function assertKnowledgeTokenCapacity(
   excludedVersionId?: string,
 ) {
   const { maxContextTokens } = getKnowledgeLimits();
+  if (maxContextTokens === null) return; // unlimited
+
   const existing = await prisma.knowledgeChunk.aggregate({
     where: {
       version: {
@@ -92,7 +99,7 @@ export async function assertKnowledgeTokenCapacity(
   if (usedTokens + incomingTokens > maxContextTokens) {
     const remaining = Math.max(0, maxContextTokens - usedTokens);
     throw new Error(
-      `This source needs about ${incomingTokens.toLocaleString()} context tokens, but only ${remaining.toLocaleString()} remain. Remove or archive knowledge before trying again.`,
+      `This source needs about ${incomingTokens.toLocaleString()} indexed tokens, but only ${remaining.toLocaleString()} remain. Remove or archive knowledge before trying again.`,
     );
   }
 }

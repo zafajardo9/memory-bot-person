@@ -2,7 +2,7 @@
 
 An authenticated, shared company notebook with an AI assistant that treats approved notes, files, and links as its primary source of truth. Every team member can capture and organize knowledge; administrators review and publish exactly what the assistant may retrieve. Chat uses explicit knowledge-search and source-reading tools, presents citations, and separates optional general AI guidance from company policy.
 
-The original weather and demonstration flight-booking tools remain available for explicit requests.
+The original weather and demonstration flight-booking tools remain available for explicit requests, joined by a safe calculator and recency-aware web search.
 
 ## Knowledge features
 
@@ -14,7 +14,8 @@ The original weather and demonstration flight-booking tools remain available for
 - Structure-aware chunking that preserves headings, pages, and source URLs
 - Gemini `gemini-embedding-2` embeddings with 768 dimensions
 - Hybrid PostgreSQL full-text and pgvector retrieval
-- `searchCompanyKnowledge`, `readCompanyKnowledge`, and `listCompanyKnowledgeSources` AI tools
+- `searchCompanyKnowledge`, `readCompanyKnowledge`, `listCompanyKnowledgeSources`, and `addKnowledgeNote` AI tools
+- Optional tag and source-type filters on company search
 - Approved-current-version filtering for every employee search
 - Source excerpts and citations rendered directly in chat
 - Clear no-evidence responses instead of invented company policy
@@ -31,9 +32,11 @@ The original weather and demonstration flight-booking tools remain available for
 - Live model discovery limited to the chat-capable models accessible to each credential
 - Chat attachments through Vercel Blob
 - Provider-neutral web research with Tavily, direct URL citations, safe page
-  extraction, and per-user daily quotas
+  extraction, per-user daily quotas, recency and domain filters, and basic/advanced depth
 - Optional read-only JavaScript-rendered page fallback through Vercel Labs
   Agent Browser, with isolated sessions and same-domain containment
+- A safe calculator tool (arithmetic, percentages, unit and live currency
+  conversion) and location-aware weather lookups
 - Private persistent user memory with conversational save/list/delete tools and
   middleware-based recall
 - Per-user agent profiles for display name, mood, answer length, custom behavior,
@@ -91,8 +94,9 @@ KNOWLEDGE_MANAGEMENT_ENABLED=true
 KNOWLEDGE_INDEXING_ENABLED=true
 KNOWLEDGE_CHAT_ENABLED=true
 KNOWLEDGE_ALLOW_LOCAL_EMBEDDINGS=false
-KNOWLEDGE_MAX_SOURCES=250
-KNOWLEDGE_MAX_CONTEXT_TOKENS=1000000
+# Optional explicit caps; omit (or set to 0/unlimited) for unlimited knowledge.
+# KNOWLEDGE_MAX_SOURCES=250
+# KNOWLEDGE_MAX_CONTEXT_TOKENS=1000000
 
 WEB_SEARCH_ENABLED=false
 TAVILY_API_KEY="your-tavily-api-key"
@@ -125,7 +129,7 @@ Set `AUTH_TRUST_HOST=true` for production only when requests pass through a trus
 
 Keep `KNOWLEDGE_ALLOW_LOCAL_EMBEDDINGS=false` in production. In non-production environments the application can fall back to deterministic local embeddings so ingestion remains testable, but Gemini embeddings provide the intended retrieval quality.
 
-`KNOWLEDGE_MAX_SOURCES` limits active workspace sources. `KNOWLEDGE_MAX_CONTEXT_TOKENS` limits the indexed tokens across ready and approved, non-archived knowledge. The Notebook shows both values as live capacity; archiving or deleting a source releases its allocation.
+Knowledge-bank storage is unlimited by default: anyone can keep adding notes, files, and links without hitting an application-level source or indexed-token ceiling. This is independent from a model's finite chat context: each turn retrieves only a bounded set of relevant passages, and a new conversation resets chat history without removing Notebook knowledge. To impose an explicit storage cap, set `KNOWLEDGE_MAX_SOURCES` (active workspace sources) and/or `KNOWLEDGE_MAX_CONTEXT_TOKENS` (indexed tokens across ready and approved, non-archived knowledge) to a positive integer; set them to `0` or `unlimited` to restore unlimited storage. The Notebook shows live indexed usage and switches to “Unlimited” when no cap is set; archiving or deleting a source releases its allocation.
 
 Set `WEB_SEARCH_ENABLED=true` and configure `TAVILY_API_KEY` to expose
 `webSearch` and `readWebPage`. Search usage is limited per user and UTC day by

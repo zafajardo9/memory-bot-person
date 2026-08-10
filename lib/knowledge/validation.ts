@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-export const MAX_KNOWLEDGE_FILE_SIZE = 8 * 1024 * 1024;
-export const MAX_URL_RESPONSE_SIZE = 3 * 1024 * 1024;
-export const MAX_EXTRACTED_TEXT_SIZE = 2_000_000;
+export const MAX_KNOWLEDGE_FILE_SIZE = 50 * 1024 * 1024;
+export const MAX_URL_RESPONSE_SIZE = 10 * 1024 * 1024;
+export const MAX_EXTRACTED_TEXT_SIZE = 5_000_000;
 
 export const supportedKnowledgeMimeTypes = [
   "text/plain",
@@ -16,7 +16,7 @@ export const createUrlKnowledgeSchema = z.object({
   url: z.string().trim().url().max(2_000),
   tags: z.array(z.string().trim().min(1).max(50)).max(20).default([]),
   crawlDepth: z.number().int().min(0).max(2).default(0),
-  crawlLimit: z.number().int().min(1).max(20).default(1),
+  crawlLimit: z.number().int().min(1).max(100).default(1),
 });
 
 export const createFileKnowledgeSchema = z.object({
@@ -26,13 +26,20 @@ export const createFileKnowledgeSchema = z.object({
 
 export const createNoteKnowledgeSchema = z.object({
   title: z.string().trim().min(2).max(200),
-  content: z.string().trim().min(10).max(100_000),
+  content: z.string().trim().min(10).max(500_000),
   tags: z.array(z.string().trim().min(1).max(50)).max(20).default([]),
 });
 
 export const knowledgeSearchSchema = z.object({
-  query: z.string().trim().min(2).max(1_000),
-  limit: z.number().int().min(1).max(10).default(8),
+  query: z.string().trim().min(2).max(2_000),
+  limit: z.number().int().min(1).max(20).default(8),
+  tags: z
+    .array(
+      z.string().trim().min(1).max(50).transform((tag) => tag.toLowerCase()),
+    )
+    .max(20)
+    .default([]),
+  sourceType: z.enum(["NOTE", "FILE", "URL"]).optional(),
 });
 
 export function validateKnowledgeFile(file: File) {
@@ -41,7 +48,7 @@ export function validateKnowledgeFile(file: File) {
   }
 
   if (file.size > MAX_KNOWLEDGE_FILE_SIZE) {
-    throw new Error("Knowledge files must be 8 MB or smaller");
+    throw new Error("Knowledge files must be 50 MB or smaller");
   }
 
   if (!supportedKnowledgeMimeTypes.includes(file.type as any)) {

@@ -45,6 +45,26 @@ describe("Tavily provider", () => {
     });
   });
 
+  it("passes recency, depth, and domain filters through to the API", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ results: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createTavilyProvider("secret-key").search("recent launch", 5, {
+      timeRange: "week",
+      searchDepth: "advanced",
+      includeDomains: ["github.com", "arxiv.org"],
+      excludeDomains: ["reddit.com"],
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toMatchObject({
+      time_range: "week",
+      search_depth: "advanced",
+      include_domains: ["github.com", "arxiv.org"],
+      exclude_domains: ["reddit.com"],
+    });
+  });
+
   it("returns a safe quota error without exposing the provider body", async () => {
     vi.stubGlobal(
       "fetch",

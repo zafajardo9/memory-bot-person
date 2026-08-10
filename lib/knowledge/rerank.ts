@@ -2,8 +2,8 @@ import "server-only";
 
 import { generateText, type LanguageModel } from "ai";
 
-const MAX_RERANK_CANDIDATES = 12;
-const SNIPPET_CHARS = 400;
+const MAX_RERANK_CANDIDATES = 20;
+const SNIPPET_CHARS = 500;
 
 /**
  * Parse "chunkId: score" lines from the re-rank model's response. Malformed

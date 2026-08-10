@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Code2,
-  Database,
   FileText,
   Globe2,
   Heading2,
@@ -82,8 +81,8 @@ interface SourceSummary {
 }
 
 interface KnowledgeUsage {
-  sources: { used: number; limit: number };
-  contextTokens: { used: number; limit: number };
+  sources: { used: number; limit: number | null };
+  contextTokens: { used: number; limit: number | null };
   passages: number;
 }
 
@@ -193,8 +192,9 @@ export function KnowledgeManager({
   const usage = data?.usage;
   const isAtCapacity = Boolean(
     usage &&
-      (usage.sources.used >= usage.sources.limit ||
-        usage.contextTokens.used >= usage.contextTokens.limit),
+      ((usage.sources.limit !== null && usage.sources.used >= usage.sources.limit) ||
+        (usage.contextTokens.limit !== null &&
+          usage.contextTokens.used >= usage.contextTokens.limit)),
   );
   const filteredSources = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -414,18 +414,15 @@ export function KnowledgeManager({
           </Button>
         </header>
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <section
-            aria-label="Notebook overview"
-            className="content-surface grid grid-cols-2 overflow-hidden rounded-3xl sm:grid-cols-4"
-          >
-            <Stat value={sources.length} label="All sources" icon={BookOpen} />
-            <Stat value={trustedCount} label="Trusted" icon={ShieldCheck} />
-            <Stat value={learningCount} label="Learning" icon={LoaderCircle} />
-            <Stat value={reviewCount} label="Needs review" icon={AlertCircle} />
-          </section>
-          <KnowledgeCapacity usage={usage} isLoading={isLoading} />
-        </div>
+        <section
+          aria-label="Notebook overview"
+          className="content-surface grid grid-cols-2 overflow-hidden rounded-3xl sm:grid-cols-4"
+        >
+          <Stat value={sources.length} label="All sources" icon={BookOpen} />
+          <Stat value={trustedCount} label="Trusted" icon={ShieldCheck} />
+          <Stat value={learningCount} label="Learning" icon={LoaderCircle} />
+          <Stat value={reviewCount} label="Needs review" icon={AlertCircle} />
+        </section>
 
         <section aria-labelledby="create-memory-heading">
           <div className="mb-4 flex items-end justify-between">
@@ -1449,136 +1446,5 @@ function Stat({
         </div>
       </div>
     </div>
-  );
-}
-
-function compactNumber(value: number) {
-  return new Intl.NumberFormat("en", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
-}
-
-function KnowledgeCapacity({
-  usage,
-  isLoading,
-}: {
-  usage?: KnowledgeUsage;
-  isLoading: boolean;
-}) {
-  if (isLoading || !usage) {
-    return (
-      <div className="h-36 animate-pulse rounded-xl border bg-muted" aria-label="Loading knowledge capacity" />
-    );
-  }
-
-  const percentage = Math.min(
-    100,
-    Math.round(
-      (usage.contextTokens.used / usage.contextTokens.limit) * 100,
-    ),
-  );
-  const circumference = 263.89;
-  const dashOffset = circumference * (1 - percentage / 100);
-  const isFull = percentage >= 100;
-  const isNearLimit = percentage >= 80;
-  const isSourceFull = usage.sources.used >= usage.sources.limit;
-  const progressColor = isFull
-    ? "stroke-destructive"
-    : isNearLimit
-      ? "stroke-amber-500"
-      : "stroke-primary";
-
-  return (
-    <aside className="content-surface rounded-3xl p-4" aria-labelledby="knowledge-capacity-heading">
-      <div className="flex items-center gap-4">
-        <div className="relative size-24 shrink-0">
-          <svg
-            viewBox="0 0 100 100"
-            className="size-full -rotate-90"
-            role="progressbar"
-            aria-label="Indexed context used"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percentage}
-          >
-            <circle
-              cx="50"
-              cy="50"
-              r="42"
-              fill="none"
-              strokeWidth="8"
-              className="stroke-muted"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r="42"
-              fill="none"
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={dashOffset}
-              className={`${progressColor} transition-[stroke-dashoffset] duration-500`}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-mono text-xl font-semibold tabular-nums">
-              {percentage}%
-            </span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
-              used
-            </span>
-          </div>
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <Database size={14} className="text-primary" />
-            <h2 id="knowledge-capacity-heading" className="text-sm font-semibold">
-              Context capacity
-            </h2>
-          </div>
-          <p className="mt-2 font-mono text-sm tabular-nums">
-            {compactNumber(usage.contextTokens.used)}
-            <span className="text-muted-foreground">
-              {" "}/ {compactNumber(usage.contextTokens.limit)} tokens
-            </span>
-          </p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Indexed text available for trusted retrieval.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 divide-x border-t pt-3 text-xs">
-        <div className="pr-3">
-          <span className="block font-mono font-medium tabular-nums">
-            {usage.sources.used.toLocaleString()} / {usage.sources.limit.toLocaleString()}
-          </span>
-          <span className="mt-0.5 block text-muted-foreground">Active sources</span>
-        </div>
-        <div className="pl-3">
-          <span className="block font-mono font-medium tabular-nums">
-            {usage.passages.toLocaleString()}
-          </span>
-          <span className="mt-0.5 block text-muted-foreground">Indexed passages</span>
-        </div>
-      </div>
-
-      {isNearLimit || isSourceFull ? (
-        <p
-          className={`mt-3 rounded-lg px-3 py-2 text-xs leading-5 ${
-            isFull || isSourceFull
-              ? "bg-destructive/10 text-destructive"
-              : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-          }`}
-        >
-          {isFull || isSourceFull
-            ? `The ${isSourceFull ? "source" : "context"} limit is full. Archive or delete knowledge before adding more.`
-            : "Context capacity is running low. Larger sources may not fit."}
-        </p>
-      ) : null}
-    </aside>
   );
 }

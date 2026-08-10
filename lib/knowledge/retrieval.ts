@@ -27,7 +27,7 @@ interface SearchRow {
   sourceUrl: string | null;
 }
 
-const CANDIDATE_POOL = 20;
+const CANDIDATE_POOL = 40;
 
 function citationFor(result: Omit<SearchRow, "score">) {
   const location = result.pageNumber
@@ -44,17 +44,26 @@ export async function searchCompanyKnowledge(input: {
   chatId?: string;
   agentId: string;
   limit?: number;
+  tags?: string[];
+  sourceType?: "NOTE" | "FILE" | "URL";
   rerankModel?: LanguageModel;
 }): Promise<KnowledgeSearchOutcome> {
   const startedAt = Date.now();
   await assertKnowledgeQueryRateLimit(input.userId);
-  const limit = Math.min(Math.max(input.limit ?? 8, 1), 10);
+  const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
   const embeddingEngines = await resolveKnowledgeEmbeddingEngines();
   const { embedding, storageModelId } = await embedKnowledgeQuery(
     input.query,
     embeddingEngines,
   );
   const vector = `[${embedding.join(",")}]`;
+  const tags = [
+    ...new Set(
+      (input.tags ?? [])
+        .map((tag) => tag.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
 
   const baseSelect = Prisma.sql`
       chunk."id"::text AS "chunkId",
@@ -78,6 +87,16 @@ export async function searchCompanyKnowledge(input: {
       AND source."currentVersionId" = version."id"
       AND version."embeddingModel" = ${storageModelId}
       AND chunk."embedding" IS NOT NULL
+      ${
+        input.sourceType
+          ? Prisma.sql`AND source."type" = ${input.sourceType}::"KnowledgeSourceType"`
+          : Prisma.empty
+      }
+      ${
+        tags.length
+          ? Prisma.sql`AND source."tags" && ARRAY[${Prisma.join(tags, ",")}]::text[]`
+          : Prisma.empty
+      }
   `;
 
   const [vectorRows, ftsRows] = await Promise.all([
@@ -90,8 +109,18 @@ export async function searchCompanyKnowledge(input: {
     prisma.$queryRaw<SearchRow[]>`
       SELECT ${baseSelect}
       ${baseFrom}
-        AND chunk."searchVector" @@ websearch_to_tsquery('english', ${input.query})
-      ORDER BY ts_rank_cd(chunk."searchVector", websearch_to_tsquery('english', ${input.query})) DESC
+        AND (
+          chunk."searchVector" @@ websearch_to_tsquery('english', ${input.query})
+          OR to_tsvector('english', array_to_string(source."tags", ' '))
+            @@ websearch_to_tsquery('english', ${input.query})
+        )
+      ORDER BY (
+        ts_rank_cd(chunk."searchVector", websearch_to_tsquery('english', ${input.query}))
+        + ts_rank_cd(
+            to_tsvector('english', array_to_string(source."tags", ' ')),
+            websearch_to_tsquery('english', ${input.query})
+          )
+      ) DESC
       LIMIT ${CANDIDATE_POOL}
     `,
   ]);
@@ -138,7 +167,7 @@ export async function searchCompanyKnowledge(input: {
 export async function readCompanyKnowledge(chunkIds: string[], agentId: string) {
   const selected = await prisma.knowledgeChunk.findMany({
     where: {
-      id: { in: chunkIds.slice(0, 10) },
+      id: { in: chunkIds.slice(0, 20) },
       version: {
         status: "APPROVED",
         source: {
@@ -157,7 +186,7 @@ export async function readCompanyKnowledge(chunkIds: string[], agentId: string) 
       const neighbors = await prisma.knowledgeChunk.findMany({
         where: {
           versionId: chunk.versionId,
-          ordinal: { gte: Math.max(0, chunk.ordinal - 1), lte: chunk.ordinal + 1 },
+          ordinal: { gte: Math.max(0, chunk.ordinal - 2), lte: chunk.ordinal + 2 },
         },
         orderBy: { ordinal: "asc" },
         select: { id: true, content: true, section: true, pageNumber: true, sourceUrl: true },

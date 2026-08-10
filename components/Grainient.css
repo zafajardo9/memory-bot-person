@@ -31,14 +31,33 @@
 }
 
 .dark .grainient-background .grainient-container {
-  opacity: 0.56;
-  filter: brightness(0.68) saturate(0.82);
+  opacity: 0.68;
+  filter: brightness(0.8) saturate(1.02);
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(
+    ellipse 48% 54% at 80% 12%,
+    #000 0%,
+    rgb(0 0 0 / 0.86) 38%,
+    transparent 76%
+  );
+  mask-image: radial-gradient(
+    ellipse 48% 54% at 80% 12%,
+    #000 0%,
+    rgb(0 0 0 / 0.86) 38%,
+    transparent 76%
+  );
+}
+
+.dark .grainient-background {
+  background:
+    radial-gradient(circle at 80% 10%, rgb(24 65 132 / 0.18), transparent 20rem),
+    #020304;
 }
 
 .dark .grainient-background::after {
   background:
-    linear-gradient(to bottom, hsl(var(--background) / 0.46), transparent 48%),
-    hsl(var(--background) / 0.38);
+    linear-gradient(to bottom, rgb(0 0 0 / 0.08), rgb(0 0 0 / 0.46)),
+    rgb(0 0 0 / 0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {

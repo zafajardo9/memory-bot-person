@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { WebSearchProvider } from "./types";
+import type { WebSearchOptions, WebSearchProvider } from "./types";
 
 const TAVILY_SEARCH_URL = "https://api.tavily.com/search";
 const SEARCH_TIMEOUT_MS = 15_000;
@@ -25,21 +25,30 @@ export function createTavilyProvider(apiKey: string): WebSearchProvider {
     id: "tavily",
     label: "Tavily",
     environmentKey: "TAVILY_API_KEY",
-    async search(query, maxResults) {
+    async search(query, maxResults, options) {
+      const body: Record<string, unknown> = {
+        query,
+        max_results: maxResults,
+        search_depth: options?.searchDepth ?? "basic",
+        include_answer: false,
+        include_raw_content: false,
+        include_images: false,
+      };
+      if (options?.timeRange) body.time_range = options.timeRange;
+      if (options?.includeDomains?.length) {
+        body.include_domains = options.includeDomains;
+      }
+      if (options?.excludeDomains?.length) {
+        body.exclude_domains = options.excludeDomains;
+      }
+
       const response = await fetch(TAVILY_SEARCH_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          query,
-          max_results: maxResults,
-          search_depth: "basic",
-          include_answer: false,
-          include_raw_content: false,
-          include_images: false,
-        }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
       });
 

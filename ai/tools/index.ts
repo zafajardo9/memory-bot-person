@@ -10,6 +10,7 @@ import {
 import { isWebSearchConfigured } from "@/lib/web/service";
 
 import { createAgentBrowserTools } from "./agent-browser";
+import { createCalculatorTool } from "./calculator";
 import { createFlightTools } from "./flights";
 import { createUserMemoryTools } from "./user-memory";
 import { createWeatherTools } from "./weather";
@@ -54,6 +55,7 @@ export async function createChatTools(input: {
       ? createUserMemoryTools(input.userId, input.agentId)
       : {}),
     ...(toolEnabled(input.enabledTools, "weather") ? createWeatherTools() : {}),
+    ...createCalculatorTool(),
     ...(toolEnabled(input.enabledTools, "flights")
       ? createFlightTools({ model: input.model, userId: input.userId })
       : {}),

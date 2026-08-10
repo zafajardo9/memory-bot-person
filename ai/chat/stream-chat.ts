@@ -52,14 +52,19 @@ async function knowledgePreflight(
       userId,
       chatId,
       agentId,
-      limit: 4,
+      limit: 8,
       rerankModel,
     });
-    return matches.length
-      ? `\n\nPreflight found relevant approved sources (below). Use them to plan focused sub-queries for the research protocol; you must still call the knowledge tools to gather evidence before answering — do not simply re-run the same query:\n${matches
-          .map((match) => `- 【${match.citation}】 ${match.content}`)
-          .join("\n")}`
-      : "\n\nPreflight knowledge check found no relevant approved company source. Use the knowledge tool and do not invent company policy.";
+    if (!matches.length) {
+      return "\n\nNOTEBOOK CHECK: The preflight search found no relevant approved company source. State that the answer was not found in approved company knowledge, and clearly separate any general guidance.";
+    }
+    const evidence = matches
+      .map(
+        (match, index) =>
+          `[${index + 1}] chunkId=${match.chunkId} 【${match.citation}】 ${match.content}`,
+      )
+      .join("\n");
+    return `\n\nNOTEBOOK EVIDENCE (preflight retrieval — approved company sources already retrieved for this turn):\n${evidence}\n\nTreat the passages above as your initial evidence: answer from them and cite each company-specific claim with 【title — section or page】. Call readCompanyKnowledge for the most relevant chunk ids to widen context when you need more than the excerpts above. Only call searchCompanyKnowledge again for a focused sub-question this evidence does not already cover — do not re-run the same query.`;
   } catch (error) {
     console.error("Knowledge preflight failed", error);
     return "\n\nThe company knowledge service is temporarily unavailable. State this limitation for company-specific questions.";

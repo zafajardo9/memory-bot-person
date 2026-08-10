@@ -4,7 +4,7 @@
 
 1. Sign in with any workspace account.
 2. Open `/knowledge`.
-3. Write a note, upload Markdown, TXT, PDF, or DOCX up to 8 MB, or add a public HTTP/HTTPS URL.
+3. Write a note, upload Markdown, TXT, PDF, or DOCX up to 50 MB, or add a public HTTP/HTTPS URL.
 4. For URLs, leave crawl depth at zero unless linked pages are also authoritative. Crawls never leave the submitted origin and stop at the configured page limit.
 5. Wait for the persisted job to finish.
 
