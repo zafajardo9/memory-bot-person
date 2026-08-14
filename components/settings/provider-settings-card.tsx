@@ -232,8 +232,10 @@ export function ProviderSettingsCard({
 
   return (
     <article
-      className={`content-surface overflow-hidden rounded-3xl transition-[background-color,border-color] ${
-        expanded ? "border-primary/25 bg-white/90 dark:bg-white/[0.065]" : "hover:border-foreground/15"
+      className={`content-surface overflow-hidden rounded-2xl transition-[background-color,border-color,box-shadow] motion-reduce:transition-none ${
+        expanded
+          ? "border-primary/25 bg-white/90 shadow-md md:col-span-2 dark:bg-white/[0.065]"
+          : "hover:border-foreground/15 hover:shadow-sm"
       }`}
     >
       <button
@@ -241,10 +243,10 @@ export function ProviderSettingsCard({
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
         aria-controls={`${provider.id}-configuration`}
-        className="group flex w-full items-center gap-4 p-4 text-left sm:p-5"
+        className="group flex min-h-40 w-full items-start gap-3 p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:p-5"
       >
         <span
-          className={`flex size-11 shrink-0 items-center justify-center rounded-xl border font-mono text-sm font-semibold uppercase ${
+          className={`flex size-10 shrink-0 items-center justify-center rounded-xl border font-mono text-xs font-semibold uppercase ${
             isActive
               ? "border-primary/20 bg-primary/10 text-primary"
               : "bg-muted text-muted-foreground"
@@ -281,22 +283,17 @@ export function ProviderSettingsCard({
               {isActive ? "Active" : provider.configured ? "Paused" : "Not connected"}
             </span>
           </span>
-          <span className="mt-1 block truncate text-sm text-muted-foreground sm:whitespace-normal">
+          <span className="mt-2 block line-clamp-2 text-sm leading-5 text-muted-foreground">
             {provider.description}
           </span>
-        </span>
-
-        <span className="hidden shrink-0 items-center gap-6 text-right sm:flex">
-          {provider.configured ? (
-            <span>
-              <span className="block text-xs text-muted-foreground">Default model</span>
-              <span className="mt-1 block max-w-44 truncate font-mono text-xs">
-                {defaultModelId}
-              </span>
+          <span className="mt-4 flex min-w-0 items-center gap-2 border-t pt-3 text-xs">
+            <span className="shrink-0 text-muted-foreground">
+              {provider.configured ? "Default" : "Connection"}
             </span>
-          ) : (
-            <span className="text-xs font-medium text-primary">Set up provider</span>
-          )}
+            <span className={`truncate ${provider.configured ? "font-mono" : "font-medium text-primary"}`}>
+              {provider.configured ? defaultModelId : "Set up provider"}
+            </span>
+          </span>
         </span>
 
         <ChevronDown
@@ -309,8 +306,8 @@ export function ProviderSettingsCard({
 
       {expanded ? (
         <div id={`${provider.id}-configuration`} className="border-t bg-muted/20">
-          <div className="grid gap-6 p-4 sm:p-5 lg:grid-cols-2 lg:p-6">
-            <section aria-labelledby={`${provider.id}-credentials-heading`}>
+          <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 lg:grid-cols-2 lg:p-6">
+            <section aria-labelledby={`${provider.id}-credentials-heading`} className="min-w-0">
               <div className="mb-4 flex items-center gap-2">
                 <KeyRound className="text-primary" size={15} />
                 <h3 id={`${provider.id}-credentials-heading`} className="text-sm font-semibold">
@@ -398,7 +395,7 @@ export function ProviderSettingsCard({
               </div>
             </section>
 
-            <section aria-labelledby={`${provider.id}-model-heading`}>
+            <section aria-labelledby={`${provider.id}-model-heading`} className="min-w-0">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h3 id={`${provider.id}-model-heading`} className="text-sm font-semibold">
                   Model availability

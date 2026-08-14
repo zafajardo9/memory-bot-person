@@ -135,7 +135,7 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
   return (
     <main className="min-h-dvh bg-transparent px-4 pb-20 pt-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <header className="grid gap-6 pb-8 md:grid-cols-[1fr_auto] md:items-end">
+        <header className="grid grid-cols-1 gap-6 pb-8 md:grid-cols-[1fr_auto] md:items-end">
           <div>
             <p className="eyebrow">Agent workspace</p>
             <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
@@ -155,7 +155,7 @@ export function AgentStudio({ initialAgents }: { initialAgents: AgentSummary[] }
           </Button>
         </header>
 
-        <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {agents.map((agent) => {
             const Icon =
               avatarIcons[agent.avatar as keyof typeof avatarIcons] ?? Sparkles;

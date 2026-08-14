@@ -2,7 +2,7 @@
 
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import cx from "classnames";
-import { MessageSquareText } from "lucide-react";
+import { ChevronRight, Folder, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { User } from "next-auth";
@@ -55,13 +55,13 @@ interface AgentSummary {
   isDefault: boolean;
 }
 
-const colorStyles: Record<string, string> = {
-  violet: "border-violet-200 bg-violet-50 text-violet-700",
-  blue: "border-blue-200 bg-blue-50 text-blue-700",
-  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  amber: "border-amber-200 bg-amber-50 text-amber-700",
-  rose: "border-rose-200 bg-rose-50 text-rose-700",
-  slate: "border-slate-200 bg-slate-50 text-slate-700",
+const folderColorStyles: Record<string, string> = {
+  violet: "text-violet-600 dark:text-violet-300",
+  blue: "text-blue-600 dark:text-blue-300",
+  emerald: "text-emerald-600 dark:text-emerald-300",
+  amber: "text-amber-600 dark:text-amber-300",
+  rose: "text-rose-600 dark:text-rose-300",
+  slate: "text-slate-600 dark:text-slate-300",
 };
 
 export const Sessions = ({ user }: { user: User | undefined }) => {
@@ -127,6 +127,21 @@ export const Sessions = ({ user }: { user: User | undefined }) => {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [collapsedAgents, setCollapsedAgents] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const toggleAgent = (agentId: string) => {
+    setCollapsedAgents((current) => {
+      const next = new Set(current);
+      if (next.has(agentId)) {
+        next.delete(agentId);
+      } else {
+        next.add(agentId);
+      }
+      return next;
+    });
+  };
 
   const handleDelete = async () => {
     const targetId = deleteId;
@@ -181,7 +196,7 @@ export const Sessions = ({ user }: { user: User | undefined }) => {
       >
         <SheetContent
           side="left"
-          className="flex w-[min(24rem,calc(100vw-1rem))] flex-col gap-0 border-slate-200! bg-white! p-0 text-slate-950! shadow-[18px_0_60px_rgb(15_23_42/0.16)] backdrop-blur-none"
+          className="flex w-[min(24rem,calc(100vw-1rem))] flex-col gap-0 p-0"
         >
           <SheetHeader>
             <VisuallyHidden.Root>
@@ -192,21 +207,21 @@ export const Sessions = ({ user }: { user: User | undefined }) => {
             </VisuallyHidden.Root>
           </SheetHeader>
 
-          <div className="border-b border-slate-200 bg-white px-5 pb-4 pt-5">
-            <div className="pr-8 text-2xl font-semibold tracking-[-0.035em] text-slate-950">
+          <div className="border-b border-border/70 px-5 pb-4 pt-5">
+            <div className="pr-8 text-2xl font-semibold tracking-[-0.035em] text-foreground">
               Sessions
             </div>
-            <div className="mt-1 text-xs leading-5 text-slate-500">
+            <div className="mt-1 text-xs leading-5 text-muted-foreground">
               {sessions === undefined
                 ? "Loading saved sessions…"
                 : `${sessions.length} saved ${sessions.length === 1 ? "session" : "sessions"} across ${groups.length} ${groups.length === 1 ? "agent" : "agents"}`}
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col bg-slate-50/80 p-3">
+          <div className="flex min-h-0 flex-1 flex-col bg-muted/30 p-3">
             {user && (
               <Button
-                className="mb-3 flex shrink-0 flex-row justify-between rounded-full bg-blue-600 text-sm font-medium text-white hover:bg-blue-700"
+                className="mb-3 flex shrink-0 flex-row justify-between rounded-full bg-primary font-medium text-primary-foreground hover:bg-primary/90"
                 asChild
               >
                 <Link href={activeAgentId ? `/agents/${activeAgentId}/chat` : "/"}>
@@ -218,19 +233,13 @@ export const Sessions = ({ user }: { user: User | undefined }) => {
 
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
               {!user ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-slate-500">
-                  <span className="flex size-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                    <InfoIcon />
-                  </span>
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
                   <div>Sign in to save and revisit sessions.</div>
                 </div>
               ) : null}
 
               {!isLoading && !error && sessions?.length === 0 && user ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-slate-500">
-                  <span className="flex size-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                    <InfoIcon />
-                  </span>
+                <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
                   <div>Your saved sessions will appear under each agent.</div>
                 </div>
               ) : null}
@@ -241,8 +250,8 @@ export const Sessions = ({ user }: { user: User | undefined }) => {
                     <InfoIcon />
                   </span>
                   <div>
-                    <p className="font-medium text-slate-900">Sessions are temporarily unavailable</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                    <p className="font-medium text-foreground">Sessions are temporarily unavailable</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       Your sessions are safe. Try loading the list again.
                     </p>
                   </div>
@@ -254,10 +263,10 @@ export const Sessions = ({ user }: { user: User | undefined }) => {
 
               {isLoading && user ? (
                 <div className="flex flex-col">
-                  {[44, 32, 28, 52].map((item) => (
+                  {["w-3/4", "w-1/2", "w-2/3", "w-5/6"].map((item) => (
                     <div key={item} className="p-2 my-[2px]">
                       <div
-                        className={`w-${item} h-[20px] animate-pulse rounded-md bg-muted`}
+                        className={`${item} h-5 animate-pulse rounded-md bg-foreground/10`}
                       />
                     </div>
                   ))}
@@ -265,105 +274,117 @@ export const Sessions = ({ user }: { user: User | undefined }) => {
               ) : null}
 
               {!error &&
-                groups.map(({ agent, sessions: agentSessions }) => (
-                  <section
-                    key={agent?.id ?? agentSessions[0]?.agentId}
-                    className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-white last:mb-0"
-                  >
-                    <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/80 p-3">
-                      <span
-                        className={`flex size-9 shrink-0 items-center justify-center rounded-full border text-xs font-semibold uppercase ${
-                          colorStyles[agent?.color ?? "violet"] ?? colorStyles.violet
-                        }`}
+                groups.map(({ agent, sessions: agentSessions }) => {
+                  const agentId = agent?.id ?? agentSessions[0]?.agentId;
+                  const isCollapsed = collapsedAgents.has(agentId);
+                  return (
+                    <div key={agentId} className="mb-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleAgent(agentId)}
+                        className="group/folder flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted/70"
                       >
-                        {agent?.name?.charAt(0) ?? "?"}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-slate-900">
+                        <ChevronRight
+                          size={13}
+                          className={cx(
+                            "shrink-0 text-muted-foreground transition-transform duration-150",
+                            { "rotate-90": !isCollapsed },
+                          )}
+                        />
+                        <Folder
+                          size={14}
+                          className={cx(
+                            "shrink-0",
+                            folderColorStyles[agent?.color ?? "violet"] ??
+                              folderColorStyles.violet,
+                          )}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
                           {agent?.name ?? "Agent"}
                         </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-slate-500">
-                          {agent?.description || "Focused assistant"}
+                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                          {agentSessions.length}
                         </span>
-                      </span>
-                      <span className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-slate-500 ring-1 ring-slate-200">
-                        {agentSessions.length} {agentSessions.length === 1 ? "session" : "sessions"}
-                      </span>
-                    </div>
-                    <div className="p-1.5">
-                      {agentSessions.length === 0 ? (
-                        <p className="p-3 text-xs text-slate-400">
-                          No saved sessions yet.
-                        </p>
-                      ) : null}
-                      {agentSessions.map((session) => (
-                        <div
-                          key={session.id}
-                          className={cx(
-                            "group flex flex-row items-center gap-1 rounded-xl pr-1 transition-colors hover:bg-slate-100",
-                            {
-                              "bg-blue-50 ring-1 ring-inset ring-blue-100":
-                                session.id === id,
-                            },
-                          )}
-                        >
-                          <span
-                            className={cx(
-                              "ml-2 flex size-6 shrink-0 items-center justify-center rounded-full text-slate-400",
-                              { "bg-blue-100 text-blue-700": session.id === id },
-                            )}
-                          >
-                            <MessageSquareText size={12} />
-                          </span>
-                          <Button
-                            variant="ghost"
-                            className={cx(
-                              "min-w-0 flex-1 justify-start p-0 text-sm font-normal hover:bg-transparent",
-                            )}
-                            asChild
-                          >
-                            <Link
-                              href={`/chat/${session.id}`}
+                      </button>
+
+                      {!isCollapsed ? (
+                        <div className="flex flex-col">
+                          {agentSessions.length === 0 ? (
+                            <p className="px-2 py-1 pl-12 text-xs text-muted-foreground">
+                              No saved sessions yet.
+                            </p>
+                          ) : null}
+                          {agentSessions.map((session) => (
+                            <div
+                              key={session.id}
                               className={cx(
-                                "block truncate rounded-xl px-2 py-2.5 text-left text-slate-700",
-                                { "font-medium text-blue-950": session.id === id },
+                                "group flex flex-row items-center gap-1 rounded-lg py-1 pl-8 pr-1 transition-colors hover:bg-muted/70",
+                                {
+                                  "bg-primary/10": session.id === id,
+                                },
                               )}
                             >
-                              {session.title}
-                            </Link>
-                          </Button>
-
-                          <DropdownMenu modal={true}>
-                            <DropdownMenuTrigger asChild>
+                              <MessageSquareText
+                                size={12}
+                                className={cx(
+                                  "shrink-0 text-muted-foreground",
+                                  { "text-primary": session.id === id },
+                                )}
+                              />
                               <Button
-                                className="size-8 shrink-0 p-0 font-normal text-slate-400 hover:bg-slate-200 hover:text-slate-700"
                                 variant="ghost"
-                                aria-label={`More options for ${session.title}`}
+                                className={cx(
+                                  "min-w-0 flex-1 justify-start p-0 text-sm font-normal hover:bg-transparent",
+                                )}
+                                asChild
                               >
-                                <MoreHorizontalIcon />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent side="left" className="z-[60] w-36 rounded-lg p-1.5">
-                              <DropdownMenuItem asChild className="rounded-md text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                <button
-                                  type="button"
-                                  className="flex w-full flex-row items-center justify-start gap-2"
-                                  onClick={() => {
-                                    setDeleteId(session.id);
-                                    setShowDeleteDialog(true);
-                                  }}
+                                <Link
+                                  href={`/chat/${session.id}`}
+                                  className={cx(
+                                    "block truncate rounded-lg px-1.5 py-1 text-left text-muted-foreground transition-colors hover:text-foreground",
+                                    {
+                                      "font-medium text-primary hover:text-primary":
+                                        session.id === id,
+                                    },
+                                  )}
                                 >
-                                  <TrashIcon />
-                                  <div>Delete</div>
-                                </button>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                  {session.title}
+                                </Link>
+                              </Button>
+
+                              <DropdownMenu modal={true}>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    className="size-7 shrink-0 p-0 font-normal text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+                                    variant="ghost"
+                                    aria-label={`More options for ${session.title}`}
+                                  >
+                                    <MoreHorizontalIcon />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent side="left" className="z-[60] w-36 rounded-lg p-1.5">
+                                  <DropdownMenuItem asChild className="rounded-md text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                    <button
+                                      type="button"
+                                      className="flex w-full flex-row items-center justify-start gap-2"
+                                      onClick={() => {
+                                        setDeleteId(session.id);
+                                        setShowDeleteDialog(true);
+                                      }}
+                                    >
+                                      <TrashIcon />
+                                      <div>Delete</div>
+                                    </button>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : null}
                     </div>
-                  </section>
-                ))}
+                  );
+                })}
             </div>
           </div>
         </SheetContent>

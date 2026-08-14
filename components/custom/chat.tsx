@@ -9,14 +9,17 @@ import {
 } from "ai";
 import { ArrowDown } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import useSWR from "swr";
 
 import { Message as PreviewMessage } from "@/components/custom/message";
 import { useScrollToBottom } from "@/components/custom/use-scroll-to-bottom";
+import { fetcher } from "@/lib/utils";
 
 import { useRegisterActiveAgent } from "./active-agent-context";
-import { ModelSelector } from "./model-selector";
 import { MultimodalInput } from "./multimodal-input";
 import { Overview } from "./overview";
+
+import type { WorkspaceAIRuntimeStatus } from "@/ai/providers/research-settings";
 
 export type ResearchDepth = "quick" | "deep";
 
@@ -33,6 +36,7 @@ export function Chat({
 }) {
   useRegisterActiveAgent(agentId);
   const [researchDepth, setResearchDepth] = useState<ResearchDepth>("quick");
+  const [humanizerEnabled, setHumanizerEnabled] = useState(true);
   const handleResearchDepthChange = useCallback((depth: ResearchDepth) => {
     setResearchDepth(depth);
   }, []);
@@ -43,9 +47,10 @@ export function Chat({
           id,
           agentId,
           researchDepth,
+          humanizerEnabled,
         }),
       }),
-    [agentId, id, researchDepth],
+    [agentId, humanizerEnabled, id, researchDepth],
   );
 
   const {
@@ -65,18 +70,18 @@ export function Chat({
     },
   });
   const [input, setInput] = useState("");
-  const [aiAvailable, setAIAvailable] = useState(false);
-  const handleAvailabilityChange = useCallback((available: boolean) => {
-    setAIAvailable(available);
-  }, []);
+  const { data: runtimeStatus } = useSWR<WorkspaceAIRuntimeStatus>(
+    `/api/ai/runtime?agentId=${encodeURIComponent(agentId)}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const aiAvailable = runtimeStatus?.available ?? false;
 
   const [messagesContainerRef, messagesEndRef, isAtBottom, scrollToBottom] =
     useScrollToBottom<HTMLDivElement>(initialMessages.length > 0);
 
   const [attachments, setAttachments] = useState<FileUIPart[]>([]);
   const isLoading = status === "submitted" || status === "streaming";
-  const [thinking, setThinking] = useState(false);
-
   const dedupedMessages = useMemo(() => {
     const seen = new Set<string>();
     return messages.filter((m) => {
@@ -156,14 +161,10 @@ export function Chat({
             setAttachments={setAttachments}
             messages={dedupedMessages}
             sendMessage={sendMessage}
-            modelSelector={
-              <ModelSelector
-                agentId={agentId}
-                onAvailabilityChange={handleAvailabilityChange}
-              />
-            }
-            thinking={thinking}
-            onThinkingChange={setThinking}
+            thinkingProviderLabel={runtimeStatus?.thinkingProviderLabel ?? null}
+            humanizerAvailable={runtimeStatus?.humanizerAvailable ?? false}
+            humanizerEnabled={humanizerEnabled}
+            onHumanizerChange={setHumanizerEnabled}
             researchDepth={researchDepth}
             onResearchDepthChange={handleResearchDepthChange}
             agentName={agentName}

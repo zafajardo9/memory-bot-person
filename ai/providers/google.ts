@@ -46,6 +46,8 @@ async function listGoogleModels(apiKey: string) {
         description: model.description?.trim(),
         chatCapable:
           model.supportedGenerationMethods?.includes("generateContent") ?? false,
+        toolCallingCapable:
+          model.supportedGenerationMethods?.includes("generateContent") ?? false,
         inputTokenLimit: model.inputTokenLimit,
         outputTokenLimit: model.outputTokenLimit,
       });

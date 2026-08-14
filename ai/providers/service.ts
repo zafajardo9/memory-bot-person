@@ -354,6 +354,11 @@ export async function deleteCustomProvider(providerId: string) {
   const config = await providerConfig(providerId);
   if (!config?.isCustom) throw new Error("Only custom providers can be deleted.");
   await prisma.$transaction([
+    prisma.workspaceAiConfig.deleteMany({ where: { researchProviderId: providerId } }),
+    prisma.workspaceAiConfig.updateMany({
+      where: { humanizerProviderId: providerId },
+      data: { humanizerProviderId: null, humanizerModelId: null },
+    }),
     prisma.userAiSelection.deleteMany({ where: { providerId } }),
     prisma.agent.updateMany({
       where: { providerId },
@@ -362,6 +367,21 @@ export async function deleteCustomProvider(providerId: string) {
     prisma.aiProviderConfig.delete({ where: { providerId } }),
   ]);
   clearProviderModelCache(providerId);
+}
+
+export async function resolveProviderLanguageModel(
+  providerId: string,
+  modelId: string,
+) {
+  const config = await providerConfig(providerId);
+  const adapter = adapterForConfig(providerId, config);
+  const apiKey = await getProviderApiKey(providerId);
+  return {
+    providerId,
+    modelId,
+    providerLabel: adapter.label,
+    model: adapter.createLanguageModel(apiKey, modelId),
+  };
 }
 
 function modelInCatalog(
@@ -488,14 +508,8 @@ export async function resolveUserLanguageModel(userId: string, agentId?: string)
       "No AI provider is available. An administrator must configure and enable one.",
     );
   }
-  const adapter = adapterForConfig(
+  return resolveProviderLanguageModel(
     catalog.selection.providerId,
-    await providerConfig(catalog.selection.providerId),
+    catalog.selection.modelId,
   );
-  const apiKey = await getProviderApiKey(adapter.id);
-  return {
-    ...catalog.selection,
-    providerLabel: adapter.label,
-    model: adapter.createLanguageModel(apiKey, catalog.selection.modelId),
-  };
 }

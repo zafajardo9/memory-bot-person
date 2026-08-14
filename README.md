@@ -115,9 +115,9 @@ AUTO_MEMORY_ENABLED=false
 
 `ADMIN_EMAILS` is a comma-separated bootstrap allowlist and must be configured before a new deployment is made public. Only allowlisted accounts become administrators. Existing allowlisted accounts are promoted the next time they sign in.
 
-Administrators may configure, test, activate, and rotate Google Gemini and OpenAI connections at `/settings/ai`. The application discovers the chat-capable models available to each credential and lets the administrator choose a default. Site-managed keys are encrypted with AES-256-GCM using `AUTH_SECRET` and take priority over `GOOGLE_GENERATIVE_AI_API_KEY` or `OPENAI_API_KEY`. Environment variables remain useful for initial setup.
+Administrators may configure, test, activate, and rotate AI provider connections at `/settings/ai`. The application discovers the chat-capable models available to each credential and lets administrators assign workspace-wide research/tool-calling and knowledge-embedding roles. Site-managed keys are encrypted with AES-256-GCM using `AUTH_SECRET` and take priority over provider environment keys. Environment variables remain useful for initial setup.
 
-Each user can choose an enabled provider and accessible model directly above the chat composer. Their selection is stored per account. Adding another provider requires one adapter in `ai/providers` and one registry entry; chat orchestration and the UI consume the shared provider contract.
+The chat composer intentionally contains no provider or model picker. It shows the workspace Thinking provider as read-only status and offers a Humanizer toggle. Thinking runs tools and gathers evidence; Humanizer routes the final visible answer through the workspace end processor for clearer, more natural language. Google is the default Thinking provider until an administrator saves another workspace role. Adding another provider requires one adapter in `ai/providers` and one registry entry; chat orchestration and the UI consume the shared provider contract.
 
 Each user can also tune their private agent at `/settings/agent`. The saved
 name appears in chat, while the mood, answer-length, and custom-behavior
@@ -252,8 +252,8 @@ app/
   (chat)/api/chat/         Thin streaming chat endpoint
   (chat)/settings/agent/   Per-user agent and memory settings
 ai/
-  chat/                    Provider-neutral streaming orchestration
-  providers/               Provider adapters, registry, credentials, and model catalog
+  chat/                    Research-to-writer streaming orchestration and fallback
+  providers/               Provider adapters, role settings, credentials, and model catalog
   memory/                  Structured automatic memory extraction
   tools/                   Knowledge, web, browser, memory, weather, and flight tools
   knowledge-tools.ts       Search/read/list tool definitions
@@ -294,6 +294,9 @@ All routes require authentication. Members may list and contribute sources and m
 | `/api/ai/providers/:id` | `GET`, `POST`, `PUT`, `DELETE` | Inspect, test, save, activate, or remove a provider connection (admin only). |
 | `/api/ai/providers/:id/models` | `GET` | Discover chat-capable models accessible to a provider credential. |
 | `/api/ai/selection` | `GET`, `PUT` | Read the provider catalog or save the current user's provider/model choice. |
+| `/api/ai/workspace` | `GET`, `PUT` | Read or save workspace Thinking and Humanizer models (admin only). |
+| `/api/ai/runtime` | `GET` | Read safe Thinking/Humanizer availability for the authenticated chat composer. |
+| `/api/ai/knowledge` | `GET`, `PUT` | Read or save the workspace knowledge-embedding model (admin only). |
 
 ## Data lifecycle
 

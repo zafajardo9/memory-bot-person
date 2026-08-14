@@ -610,7 +610,7 @@ export default async function ToolsPage() {
             accent={amber}
             headingId="tips-heading"
           />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {tips.map((tip) => (
               <div
                 key={tip.title}
@@ -689,7 +689,7 @@ export default async function ToolsPage() {
                 OpenAI, Anthropic, DeepSeek, Mistral, and Groq without any
                 provider-specific code.
               </p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div className="rounded-2xl bg-foreground/[0.03] px-3 py-2.5">
                   <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Provider Registry

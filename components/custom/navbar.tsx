@@ -91,6 +91,7 @@ export function NavigationBar({
         {user ? (
           <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
             <AgentSelector />
+            <ThemeToggle />
             <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -187,10 +188,6 @@ export function NavigationBar({
                   <UserIcon size={15} className="text-muted-foreground" />
                   Account settings
                 </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild className="h-10 rounded-lg p-0">
-                <ThemeToggle className="h-10 px-2" />
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <form action={signOutAction}>

@@ -70,6 +70,7 @@ export function createOpenAICompatibleAdapter(input: {
             ? `Owned by ${model.owned_by}`
             : undefined,
           chatCapable: true,
+          toolCallingCapable: true,
         }));
     },
   };

@@ -1,11 +1,12 @@
 "use client";
 
 import {
+  BrainCircuit,
   Compass,
   FileUp,
   ImagePlus,
-  Lightbulb,
   SlidersHorizontal,
+  WandSparkles,
 } from "lucide-react";
 import Link from "next/link";
 import React, {
@@ -52,9 +53,10 @@ export function MultimodalInput({
   setAttachments,
   messages,
   sendMessage,
-  modelSelector,
-  thinking,
-  onThinkingChange,
+  thinkingProviderLabel,
+  humanizerAvailable,
+  humanizerEnabled,
+  onHumanizerChange,
   researchDepth,
   onResearchDepthChange,
   agentName,
@@ -74,9 +76,10 @@ export function MultimodalInput({
     message?: { text: string; files?: FileUIPart[] },
     options?: ChatRequestOptions,
   ) => Promise<void>;
-  modelSelector: React.ReactNode;
-  thinking: boolean;
-  onThinkingChange: (value: boolean) => void;
+  thinkingProviderLabel: string | null;
+  humanizerAvailable: boolean;
+  humanizerEnabled: boolean;
+  onHumanizerChange: (value: boolean) => void;
   researchDepth: ResearchDepth;
   onResearchDepthChange: (value: ResearchDepth) => void;
   agentName: string;
@@ -114,7 +117,7 @@ export function MultimodalInput({
 
   const submitForm = useCallback(() => {
     if (!aiAvailable) {
-      toast.error("Choose an available AI provider before sending a message.");
+      toast.error("Workspace AI is unavailable. Ask an administrator to configure it.");
       return;
     }
     const text = input.trim();
@@ -294,22 +297,40 @@ export function MultimodalInput({
         />
 
         <div className="flex min-h-12 flex-wrap items-center gap-1.5 px-2.5 pb-2.5">
-          <div className="min-w-0 max-w-full shrink overflow-hidden">
-            {modelSelector}
-          </div>
+          <span
+            className="flex max-w-[180px] shrink items-center gap-1.5 rounded-full border border-primary/15 bg-primary/[0.07] px-2.5 py-1 text-xs text-foreground"
+            title={
+              thinkingProviderLabel
+                ? "Workspace Thinking is ready"
+                : "Workspace thinking model unavailable"
+            }
+          >
+            <BrainCircuit size={13} className="shrink-0 text-primary" />
+            <span className="truncate">
+              {thinkingProviderLabel ? "Thinking" : "Thinking unavailable"}
+            </span>
+          </span>
           <button
             type="button"
-            onClick={() => onThinkingChange(!thinking)}
+            onClick={() => onHumanizerChange(!humanizerEnabled)}
+            disabled={!humanizerAvailable}
             className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-              thinking
+              humanizerEnabled && humanizerAvailable
                 ? "border-primary/25 bg-primary/10 text-primary"
-                : "border-transparent text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent"
             }`}
-            title={thinking ? "Reasoning on" : "Reasoning off"}
-            aria-label={thinking ? "Disable reasoning" : "Enable reasoning"}
+            title={
+              humanizerAvailable
+                ? humanizerEnabled
+                  ? "Humanizer on: final answers use the workspace end processor"
+                  : "Humanizer off: the thinking model writes the final answer"
+                : "Ask an administrator to configure a Humanizer model"
+            }
+            aria-pressed={humanizerEnabled && humanizerAvailable}
+            aria-label={humanizerEnabled ? "Disable Humanizer" : "Enable Humanizer"}
           >
-            <Lightbulb size={13} />
-            Think
+            <WandSparkles size={13} />
+            Humanizer
           </button>
           <button
             type="button"

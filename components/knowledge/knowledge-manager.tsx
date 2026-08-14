@@ -378,7 +378,7 @@ export function KnowledgeManager({
   return (
     <main className="min-h-dvh overflow-hidden bg-transparent">
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-20 pt-24 sm:px-6 lg:pt-28">
-        <header className="grid gap-7 pb-8 lg:grid-cols-[1fr_auto] lg:items-end">
+        <header className="grid grid-cols-1 gap-7 pb-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div className="flex items-start gap-4">
             <span className="mt-1 flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Library size={20} />
@@ -439,7 +439,7 @@ export function KnowledgeManager({
               Available only to {activeAgent?.name ?? agentName}
             </span>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {(["NOTE", "FILE", "URL"] as ComposerTab[]).map((item) => {
               const meta = typeMeta[item];
               const Icon = meta.icon;
@@ -790,7 +790,7 @@ export function KnowledgeManager({
                       />
                     </div>
                   </Field>
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Field label="Title">
                       <Input
                         name="title"
@@ -806,7 +806,7 @@ export function KnowledgeManager({
                     <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Scan settings
                     </p>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <Field label="Crawl depth" hint="0–2 links deep">
                         <Input
                           name="crawlDepth"

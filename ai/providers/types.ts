@@ -5,6 +5,7 @@ export interface AIProviderModel {
   label: string;
   description?: string;
   chatCapable: boolean;
+  toolCallingCapable: boolean;
   custom?: boolean;
   inputTokenLimit?: number;
   outputTokenLimit?: number;

@@ -32,6 +32,7 @@ export function mergeCustomModels(
       label: modelId,
       description: "Custom workspace model ID",
       chatCapable: true,
+      toolCallingCapable: true,
       custom: true,
     }));
 

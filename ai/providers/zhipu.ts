@@ -15,6 +15,7 @@ async function listZhipuModels(_apiKey: string) {
       description:
         "Latest flagship — 1M context, SOTA coding and long-horizon agentic tasks.",
       chatCapable: true,
+      toolCallingCapable: true,
       inputTokenLimit: 1000000,
       outputTokenLimit: 128000,
     },
@@ -24,6 +25,7 @@ async function listZhipuModels(_apiKey: string) {
       description:
         "Frontier reasoning and coding, aligned with leading Western frontier models.",
       chatCapable: true,
+      toolCallingCapable: true,
       inputTokenLimit: 200000,
       outputTokenLimit: 128000,
     },
@@ -33,6 +35,7 @@ async function listZhipuModels(_apiKey: string) {
       description:
         "Strong agentic planning and execution for long-running tasks.",
       chatCapable: true,
+      toolCallingCapable: true,
       inputTokenLimit: 200000,
       outputTokenLimit: 128000,
     },
@@ -42,6 +45,7 @@ async function listZhipuModels(_apiKey: string) {
       description:
         "Fast, lightweight model with a generous free tier — good for everyday chat.",
       chatCapable: true,
+      toolCallingCapable: true,
       inputTokenLimit: 200000,
       outputTokenLimit: 128000,
     },
@@ -51,6 +55,7 @@ async function listZhipuModels(_apiKey: string) {
       description:
         "Small, high-speed model for writing, translation, and general-purpose tasks.",
       chatCapable: true,
+      toolCallingCapable: true,
       inputTokenLimit: 200000,
       outputTokenLimit: 128000,
     },

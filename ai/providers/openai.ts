@@ -62,6 +62,7 @@ async function listOpenAIModels(apiKey: string) {
       label: model.id,
       description: model.owned_by ? `Owned by ${model.owned_by}` : undefined,
       chatCapable: isOpenAIChatModel(model.id),
+      toolCallingCapable: isOpenAIChatModel(model.id),
     }));
 }
 

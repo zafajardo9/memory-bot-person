@@ -50,6 +50,7 @@ async function listGroqModels(apiKey: string) {
       label: model.id,
       description: model.owned_by ? `Owned by ${model.owned_by}` : undefined,
       chatCapable: isGroqChatModel(model.id),
+      toolCallingCapable: isGroqChatModel(model.id),
     }));
 }
 

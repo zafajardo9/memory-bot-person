@@ -110,8 +110,8 @@ export function CustomProviderDialog({
         </div>
 
         <div className="space-y-5 px-5 py-6 sm:px-7">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="custom-provider-name">Provider name</Label>
               <Input
                 id="custom-provider-name"
@@ -121,7 +121,7 @@ export function CustomProviderDialog({
                 maxLength={80}
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <Label htmlFor="custom-provider-key">API key</Label>
                 <span className="text-[11px] text-muted-foreground">Optional for local models</span>

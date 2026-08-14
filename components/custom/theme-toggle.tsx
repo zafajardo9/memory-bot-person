@@ -17,7 +17,12 @@ export const ThemeToggle = forwardRef<
     <button
       ref={ref}
       type="button"
-      className={cn("flex w-full cursor-pointer items-center gap-3", className)}
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      title={isDark ? "Use light theme" : "Use dark theme"}
+      className={cn(
+        "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full p-0 text-muted-foreground transition-colors hover:bg-foreground/[0.055] hover:text-foreground",
+        className,
+      )}
       {...props}
       onClick={(event) => {
         setTheme(isDark ? "light" : "dark");
@@ -25,11 +30,10 @@ export const ThemeToggle = forwardRef<
       }}
     >
       {isDark ? (
-        <Sun size={15} className="text-muted-foreground" />
+        <Sun size={16} className="text-muted-foreground" />
       ) : (
-        <Moon size={15} className="text-muted-foreground" />
+        <Moon size={16} className="text-muted-foreground" />
       )}
-      {isDark ? "Use light theme" : "Use dark theme"}
     </button>
   );
 });

@@ -1,14 +1,22 @@
 import {
   convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   stepCountIs,
   streamText,
   type LanguageModel,
   type UIMessage,
+  type UIMessageChunk,
+  type UIMessageStreamOnFinishCallback,
   wrapLanguageModel,
 } from "ai";
 
 import { createMemoryMiddleware } from "@/ai/custom-middleware";
 import { companyAssistantSystemPrompt } from "@/ai/prompts/company-assistant";
+import {
+  resolveWorkspaceHumanizerModel,
+  resolveWorkspaceResearchModel,
+} from "@/ai/providers/research-settings";
 import { resolveUserLanguageModel } from "@/ai/providers/service";
 import { createChatTools } from "@/ai/tools";
 import { getAgentForUserDetailed } from "@/db/agent-queries";
@@ -71,12 +79,32 @@ async function knowledgePreflight(
   }
 }
 
+interface ChatStreamResponseOptions {
+  originalMessages?: UIMessage[];
+  sendReasoning?: boolean;
+  sendSources?: boolean;
+  onError?: (error: unknown) => string;
+  onFinish?: UIMessageStreamOnFinishCallback<UIMessage>;
+}
+
+function isResearchNarrativeChunk(chunk: UIMessageChunk) {
+  return (
+    chunk.type === "text-start" ||
+    chunk.type === "text-delta" ||
+    chunk.type === "text-end" ||
+    chunk.type === "reasoning-start" ||
+    chunk.type === "reasoning-delta" ||
+    chunk.type === "reasoning-end"
+  );
+}
+
 export async function streamCompanyChat(input: {
   chatId: string;
   messages: UIMessage[];
   userId: string;
   agentId: string;
   researchDepth?: string;
+  humanizerEnabled?: boolean;
 }) {
   const userText = latestUserText(input.messages);
   const isDeepMode = input.researchDepth === "deep";
@@ -84,9 +112,16 @@ export async function streamCompanyChat(input: {
     hasWebResearchConsent(input.messages) || isDeepMode;
   const agent = await getAgentForUserDetailed(input.agentId, input.userId);
   if (!agent) throw new Error("Agent not found.");
-  const [selected] = await Promise.all([
-    resolveUserLanguageModel(input.userId, input.agentId),
+  const humanizerRequested = input.humanizerEnabled !== false;
+  const [researchSelection, humanizerSelection] = await Promise.all([
+    resolveWorkspaceResearchModel(),
+    !humanizerRequested
+      ? Promise.resolve(null)
+      : resolveWorkspaceHumanizerModel(),
   ]);
+  const selected =
+    researchSelection ??
+    (await resolveUserLanguageModel(input.userId, input.agentId));
   const agentSettings = agentSettingsFromProfile(agent);
   const modelMessages = (
     await convertToModelMessages(input.messages, {
@@ -99,19 +134,22 @@ export async function streamCompanyChat(input: {
     input.chatId,
     input.agentId,
     agent.enabledTools,
-    selected.model,
+    researchSelection?.model ?? selected.model,
   );
-  const model =
-    typeof selected.model === "string" ||
+  const writerSelection = humanizerSelection ?? selected;
+  const writerModel = writerSelection.model;
+  const researchBaseModel = selected.model;
+  const researchModel =
+    typeof researchBaseModel === "string" ||
     !toolEnabled(agent.enabledTools, "memory")
-      ? selected.model
+      ? researchBaseModel
       : wrapLanguageModel({
-          model: selected.model,
+          model: researchBaseModel,
           middleware: createMemoryMiddleware(input.userId, input.agentId),
         });
 
   const tools = await createChatTools({
-    model: selected.model,
+    model: researchBaseModel,
     userId: input.userId,
     chatId: input.chatId,
     agentId: input.agentId,
@@ -124,37 +162,105 @@ export async function streamCompanyChat(input: {
     webSearch: "webSearch" in tools,
   });
 
-  const result = streamText({
-    model,
-    system: `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText, isDeepMode)}\n\n${formatAgentSettingsForPrompt(agentSettings)}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`,
+  const system = `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText, isDeepMode)}\n\n${formatAgentSettingsForPrompt(agentSettings)}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`;
+  const prepareStep = ({ stepNumber }: { stepNumber: number }) => {
+    if (stepNumber === 0 && linkPlan.reader) {
+      return {
+        activeTools: [linkPlan.reader] as Array<keyof typeof tools>,
+        toolChoice: { type: "tool" as const, toolName: linkPlan.reader },
+      };
+    }
+    if (stepNumber === 1 && linkPlan.expandWithSearch) {
+      return {
+        activeTools: ["webSearch"] as Array<keyof typeof tools>,
+        toolChoice: { type: "tool" as const, toolName: "webSearch" as const },
+      };
+    }
+    return {};
+  };
+
+  const singleModelResult = () => streamText({
+    model: researchModel,
+    system,
     messages: modelMessages,
     stopWhen: stepCountIs(14),
     tools,
-    prepareStep: ({ stepNumber }) => {
-      if (stepNumber === 0 && linkPlan.reader) {
-        return {
-          activeTools: [linkPlan.reader],
-          toolChoice: { type: "tool", toolName: linkPlan.reader },
-        };
-      }
-      if (stepNumber === 1 && linkPlan.expandWithSearch) {
-        return {
-          activeTools: ["webSearch"],
-          toolChoice: { type: "tool", toolName: "webSearch" },
-        };
-      }
-      return {};
-    },
+    prepareStep,
     experimental_telemetry: {
       isEnabled: true,
       functionId: `chat:${selected.providerId}:${selected.modelId}`,
     },
   });
 
+  const splitFlow = Boolean(researchSelection || humanizerRequested);
+  const result = splitFlow
+    ? {
+        toUIMessageStreamResponse(options: ChatStreamResponseOptions = {}) {
+          const onError = options.onError ?? (() => "An error occurred.");
+          const stream = createUIMessageStream<UIMessage>({
+            originalMessages: options.originalMessages,
+            onError,
+            onFinish: options.onFinish,
+            execute: async ({ writer }) => {
+              const researchResult = streamText({
+                model: researchModel,
+                system: `${system}\n\nRESEARCH PHASE: Gather the evidence needed for the user's request. Use the available tools when they can improve grounding. End with a compact evidence brief for the answer-writing model; do not address the user directly.`,
+                messages: modelMessages,
+                stopWhen: stepCountIs(10),
+                tools,
+                prepareStep,
+                experimental_telemetry: {
+                  isEnabled: true,
+                  functionId: `research:${selected.providerId}:${selected.modelId}:writer:${writerSelection.providerId}:${writerSelection.modelId}`,
+                },
+              });
+              const researchUIStream = researchResult
+                .toUIMessageStream({
+                  sendStart: true,
+                  sendFinish: false,
+                  sendReasoning: false,
+                  sendSources: options.sendSources,
+                  onError,
+                })
+                .pipeThrough(
+                  new TransformStream<UIMessageChunk, UIMessageChunk>({
+                    transform(chunk, controller) {
+                      if (!isResearchNarrativeChunk(chunk)) controller.enqueue(chunk);
+                    },
+                  }),
+                );
+              writer.merge(researchUIStream);
+
+              const researchResponse = await researchResult.response;
+              const writerResult = streamText({
+                model: writerModel,
+                system: `${system}\n\nANSWER PHASE: Write the final answer to the user now. The immediately preceding assistant/tool transcript contains the gathered evidence. Use it as evidence, preserve valid citations, do not call tools, and do not mention this handoff.${humanizerRequested ? " Humanize the answer: make it clear, natural, warm, direct, and free of robotic phrasing without changing facts or citations." : " Keep the answer clear and direct without adding an extra rewriting style."}`,
+                messages: [...modelMessages, ...researchResponse.messages],
+                experimental_telemetry: {
+                  isEnabled: true,
+                  functionId: `answer:${writerSelection.providerId}:${writerSelection.modelId}:thinking:${selected.providerId}:${selected.modelId}:humanizer:${humanizerRequested}`,
+                },
+              });
+              writer.merge(
+                writerResult.toUIMessageStream({
+                  sendStart: false,
+                  sendFinish: true,
+                  sendReasoning: options.sendReasoning,
+                  sendSources: options.sendSources,
+                  onError,
+                }),
+              );
+            },
+          });
+          return createUIMessageStreamResponse({ stream });
+        },
+      }
+    : singleModelResult();
+
   return {
     result,
     selection: selected,
-    extractionModel: selected.model,
+    extractionModel: writerModel,
     memoryEnabled: toolEnabled(agent.enabledTools, "memory"),
   };
 }

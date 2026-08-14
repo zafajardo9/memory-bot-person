@@ -17,6 +17,7 @@ const chatRequestSchema = z.object({
   agentId: z.string().uuid(),
   messages: z.array(z.custom<UIMessage>()),
   researchDepth: z.enum(["quick", "deep"]).optional(),
+  humanizerEnabled: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, agentId, messages, researchDepth } = chatRequestSchema.parse(
+    const { id, agentId, messages, researchDepth, humanizerEnabled } = chatRequestSchema.parse(
       await request.json(),
     );
     const existingChat = await getChatById({ id });
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       userId: session.user.id,
       agentId,
       researchDepth: resolvedDepth,
+      humanizerEnabled: humanizerEnabled ?? true,
     });
 
     return result.toUIMessageStreamResponse({

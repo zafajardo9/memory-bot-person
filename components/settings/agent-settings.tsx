@@ -364,7 +364,7 @@ export function AgentSettingsPanel({
 
                 <fieldset className="space-y-3">
                   <legend className="text-sm font-medium">Mood and tone</legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {AGENT_MOODS.map((mood) => {
                       const detail = moodDetails[mood];
                       const active = settings.mood === mood;
@@ -608,7 +608,7 @@ export function AgentSettingsPanel({
                       remain managed centrally; this controls access per agent.
                     </p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {AGENT_TOOLS.map((tool) => {
                       const active = enabledTools.includes(tool);
                       const descriptions: Record<AgentTool, string> = {
@@ -687,7 +687,7 @@ export function AgentSettingsPanel({
                     </span>
                   </div>
                 <div className="rounded-xl border border-dashed bg-muted/20 p-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="memory-title">Memory title</Label>
                       <Input

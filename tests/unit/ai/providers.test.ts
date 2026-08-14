@@ -34,6 +34,18 @@ describe("AI provider registry", () => {
     );
   });
 
+  it("marks every statically catalogued chat model as tool-call capable", async () => {
+    const staticProviders = listAIProviderAdapters().filter(
+      (provider) => !["google", "openai", "groq"].includes(provider.id),
+    );
+
+    for (const provider of staticProviders) {
+      const models = await provider.listModels("test-key");
+      expect(models.length).toBeGreaterThan(0);
+      expect(models.every((model) => model.toolCallingCapable)).toBe(true);
+    }
+  });
+
   it("rejects unknown provider identifiers", () => {
     expect(isAIProviderId("nonexistent")).toBe(false);
     expect(() => getAIProviderAdapter("nonexistent")).toThrow(
@@ -73,6 +85,7 @@ describe("custom provider models", () => {
             id: "vendor/new-model",
             label: "New model",
             chatCapable: true,
+            toolCallingCapable: true,
           },
         ],
         customModelIds,
@@ -82,12 +95,14 @@ describe("custom provider models", () => {
         id: "vendor/new-model",
         label: "New model",
         chatCapable: true,
+        toolCallingCapable: true,
       },
       {
         id: "vendor/preview-model",
         label: "vendor/preview-model",
         description: "Custom workspace model ID",
         chatCapable: true,
+        toolCallingCapable: true,
         custom: true,
       },
     ]);
