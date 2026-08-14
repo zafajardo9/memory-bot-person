@@ -10,7 +10,6 @@ import {
   ExternalLink,
   FileSearch,
   Globe2,
-  LoaderCircle,
   Save,
   Search,
   Trash2,
@@ -198,7 +197,7 @@ function WebSearchOutput({ output }: { output: unknown }) {
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="group block border-l-2 border-primary/15 py-1 pl-3 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group block rounded-lg py-1.5 pl-2 transition-colors hover:bg-foreground/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="flex items-start justify-between gap-3">
               <span className="min-w-0">
@@ -240,7 +239,7 @@ function ReadWebPageOutput({ output }: { output: unknown }) {
       href={output.url}
       target="_blank"
       rel="noreferrer"
-      className="mt-2 flex items-center justify-between gap-3 border-l-2 border-primary/15 py-1 pl-3 text-sm transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="mt-2 flex items-center justify-between gap-3 rounded-lg py-1.5 pl-2 text-sm transition-colors hover:bg-foreground/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="min-w-0">
         <span className="block truncate font-medium">{domain}</span>
@@ -268,7 +267,7 @@ function GenericOutput({ output }: { output: unknown }) {
           />
         </span>
       </summary>
-      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap border-l-2 border-primary/15 py-1 pl-3 font-mono text-[11px] leading-4">
+      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-foreground/[0.025] p-2.5 font-mono text-[11px] leading-4">
         {JSON.stringify(output, null, 2)}
       </pre>
     </details>
@@ -366,20 +365,40 @@ function ToolOutput({
   return <GenericOutput output={output} />;
 }
 
+export function ProcessingCircles({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center ${compact ? "gap-0.5" : "gap-1"}`}
+      role="status"
+      aria-label="Processing"
+    >
+      {[0, 1, 2].map((index) => (
+        <span
+          key={index}
+          aria-hidden
+          className={`rounded-full bg-primary/70 animate-[pulse_1.2s_ease-in-out_infinite] motion-reduce:animate-none ${
+            compact ? "size-1" : "size-1.5"
+          }`}
+          style={{ animationDelay: `${index * 160}ms` }}
+        />
+      ))}
+    </span>
+  );
+}
+
 function ReasoningActivity({ part }: { part: ReasoningUIPart }) {
   const isStreaming = part.state === "streaming";
 
   return (
-    <div className="relative pb-4 pl-8 last:pb-0">
-      <span className="absolute left-[9px] top-6 h-[calc(100%-12px)] w-px bg-primary/15 last:hidden" />
-      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+    <div className="relative pb-3 pl-7 last:pb-0">
+      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full bg-primary/[0.055] text-primary/70">
         <BrainCircuit size={11} />
       </span>
       <details className="group/reasoning" open={isStreaming || undefined}>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <span>{isStreaming ? "Thinking" : "Thought through the request"}</span>
           {isStreaming ? (
-            <LoaderCircle size={12} className="animate-spin text-primary" />
+            <ProcessingCircles compact />
           ) : (
             <ChevronDown
               size={12}
@@ -387,7 +406,7 @@ function ReasoningActivity({ part }: { part: ReasoningUIPart }) {
             />
           )}
         </summary>
-        <div className="mt-1.5 pl-0.5 text-[13px] leading-6 text-muted-foreground">
+        <div className="mt-1.5 pl-0.5 text-[13px] leading-6 text-muted-foreground/75">
           <Streamdown>{part.text}</Streamdown>
         </div>
       </details>
@@ -417,15 +436,14 @@ function ToolActivity({
         : "";
 
   return (
-    <div className="relative pb-4 pl-8 last:pb-0">
-      <span className="absolute left-[9px] top-6 h-[calc(100%-12px)] w-px bg-primary/15 last:hidden" />
+    <div className="relative pb-3 pl-7 last:pb-0">
       <span
-        className={`absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full border ${
+        className={`absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full ${
           state.tone === "error"
-            ? "border-destructive/30 bg-destructive/10 text-destructive"
+            ? "bg-destructive/[0.07] text-destructive/80"
             : state.tone === "done"
-              ? "border-primary/10 bg-primary/15 text-primary"
-              : "border-primary/10 bg-primary/10 text-primary"
+              ? "bg-primary/[0.07] text-primary/75"
+              : "bg-primary/[0.055] text-primary/70"
         }`}
       >
         {state.tone === "error" ? (
@@ -449,14 +467,14 @@ function ToolActivity({
               state.tone === "error"
                 ? "text-destructive"
                 : state.tone === "done"
-                  ? "text-primary"
+                  ? "text-muted-foreground/70"
                   : state.tone === "waiting"
                     ? "text-amber-700 dark:text-amber-300"
-                    : "text-primary"
+                    : "text-primary/75"
             }`}
           >
             {state.tone === "active" ? (
-              <LoaderCircle size={10} className="animate-spin" />
+              <ProcessingCircles compact />
             ) : null}
             {state.label}
           </span>
@@ -479,8 +497,8 @@ function SourcesActivity({ sources }: { sources: SourceUrlUIPart[] }) {
   if (sources.length === 0) return null;
 
   return (
-    <div className="relative pl-8">
-      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full bg-primary/15 text-primary">
+    <div className="relative pl-7">
+      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full bg-primary/[0.07] text-primary/75">
         <Check size={11} />
       </span>
       <div className="text-sm font-medium">Sources ready</div>
@@ -576,11 +594,11 @@ export function AssistantActivity({
   return (
     <section aria-label="Assistant work trace" className="text-sm">
       <details className="group/work" open={isActive || undefined}>
-        <summary className="flex w-fit cursor-pointer list-none items-center gap-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <summary className="flex w-fit cursor-pointer list-none items-center gap-2 py-0.5 text-xs font-medium text-muted-foreground/75 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {isActive ? (
-            <LoaderCircle size={13} className="animate-spin text-primary" />
+            <ProcessingCircles />
           ) : (
-            <Check size={13} className="text-primary" />
+            <Check size={13} className="text-primary/70" />
           )}
           <span>{headerLabel}</span>
           <ChevronDown
@@ -590,7 +608,7 @@ export function AssistantActivity({
         </summary>
 
         {hasActivity ? (
-          <div className="mt-3 pl-0.5">
+          <div className="mt-3 pl-0.5 opacity-90">
             {reasoning.map((part, index) => (
               <ReasoningActivity key={`reasoning-${index}`} part={part} />
             ))}

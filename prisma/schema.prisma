@@ -61,6 +61,7 @@ model User {
   aiSelection      UserAiSelection?
   agentSettings    UserAgentSettings?
   memories         UserMemory[]
+  skills           UserSkill[]              @relation("UserSkills")
   agents           Agent[]
   webSearchUsage   WebSearchUsage[]
 
@@ -355,6 +356,24 @@ model UserMemory {
   @@index([userId, priority, updatedAt])
   @@index([agentId, priority, updatedAt])
   @@map("UserMemory")
+}
+
+model UserSkill {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  slug         String   @db.VarChar(40)
+  name         String   @db.VarChar(60)
+  description  String   @default("") @db.VarChar(200)
+  instructions String   @db.Text
+  enabled      Boolean  @default(true)
+  usageCount   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation("UserSkills", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
+  @@index([userId])
+  @@map("UserSkill")
 }
 
 model WebSearchUsage {

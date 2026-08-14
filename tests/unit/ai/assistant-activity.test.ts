@@ -4,6 +4,7 @@ import {
   describeToolInput,
   getToolPresentation,
 } from "../../../components/custom/assistant-activity";
+import { getSubmissionMode } from "../../../components/custom/chat";
 
 describe("assistant activity hierarchy", () => {
   it("uses plain-language labels for web, file, and memory work", () => {
@@ -46,5 +47,25 @@ describe("assistant activity hierarchy", () => {
     expect(getToolPresentation("analyzeDocument").activeLabel).toBe(
       "Using analyze document",
     );
+  });
+});
+
+describe("chat submission queue", () => {
+  it("sends immediately while idle", () => {
+    expect(
+      getSubmissionMode({ isLoading: false, hasQueuedMessage: false }),
+    ).toBe("send");
+  });
+
+  it("queues one message while an answer is generating", () => {
+    expect(
+      getSubmissionMode({ isLoading: true, hasQueuedMessage: false }),
+    ).toBe("queue");
+  });
+
+  it("blocks another submission when the queue is occupied", () => {
+    expect(
+      getSubmissionMode({ isLoading: true, hasQueuedMessage: true }),
+    ).toBe("blocked");
   });
 });

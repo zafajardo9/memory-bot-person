@@ -10,12 +10,15 @@ import {
   isUserMemoryEnabled,
 } from "@/lib/memory/config";
 
+import type { ChatMessageMetadata } from "@/lib/skills";
 import type { UIMessage } from "ai";
+
+type ChatUIMessage = UIMessage<ChatMessageMetadata>;
 
 const chatRequestSchema = z.object({
   id: z.string().uuid(),
   agentId: z.string().uuid(),
-  messages: z.array(z.custom<UIMessage>()),
+  messages: z.array(z.custom<ChatUIMessage>()),
   researchDepth: z.enum(["quick", "deep"]).optional(),
   humanizerEnabled: z.boolean().optional(),
 });
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
     const existingChat = await getChatById({ id });
     const resolvedDepth =
       researchDepth ?? existingChat?.researchDepth ?? "quick";
-    const { result, extractionModel, memoryEnabled } = await streamCompanyChat({
+    const { result, extractionModel, memoryEnabled, appliedSkill } = await streamCompanyChat({
       chatId: id,
       messages,
       userId: session.user.id,
@@ -46,6 +49,7 @@ export async function POST(request: Request) {
       originalMessages: messages,
       sendReasoning: true,
       sendSources: true,
+      messageMetadata: appliedSkill ? () => ({ appliedSkill }) : undefined,
       onError: publicChatErrorMessage,
       onFinish: async ({ messages: finishedMessages }) => {
         try {

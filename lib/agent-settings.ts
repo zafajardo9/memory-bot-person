@@ -61,7 +61,7 @@ export const agentSettingsSchema = z.object({
     .default([]),
 });
 
-function escapePromptData(value: string) {
+export function escapePromptData(value: string) {
   return value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

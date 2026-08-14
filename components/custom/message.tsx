@@ -7,7 +7,7 @@ import {
   isToolUIPart,
   type UIMessage,
 } from "ai";
-import { Check, Copy, Paperclip, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Check, Command, Copy, Paperclip, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,6 +16,8 @@ import { ChatMarkdown } from "./chat-markdown";
 import { FollowUpQuestions } from "./follow-up-questions";
 import { BotIcon, UserIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
+
+import type { ChatMessageMetadata } from "@/lib/skills";
 
 export const Message = ({
   chatId,
@@ -45,6 +47,9 @@ export const Message = ({
   const sources = message.parts.filter((part) => part.type === "source-url");
   const isAssistant = role === "assistant";
   const showAnswer = isAssistant && Boolean(content);
+  const appliedSkill = isAssistant
+    ? (message.metadata as ChatMessageMetadata | undefined)?.appliedSkill
+    : undefined;
 
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<1 | -1 | null>(null);
@@ -121,6 +126,12 @@ export const Message = ({
         {isAssistant ? (
           <div className="-mb-1 text-xs font-semibold text-foreground">
             {agentName}
+          </div>
+        ) : null}
+        {appliedSkill ? (
+          <div className="-my-1 flex w-fit items-center gap-1.5 rounded-full bg-primary/[0.07] px-2.5 py-1 text-[11px] font-medium text-primary/85">
+            <Command size={11} aria-hidden />
+            Using skill: {appliedSkill.name}
           </div>
         ) : null}
         {!isAssistant && attachments.length > 0 ? (

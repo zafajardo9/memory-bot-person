@@ -8,7 +8,7 @@ import {
   type UIMessage,
 } from "ai";
 import { ArrowDown } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 
 import { Message as PreviewMessage } from "@/components/custom/message";
@@ -22,6 +22,20 @@ import { Overview } from "./overview";
 import type { WorkspaceAIRuntimeStatus } from "@/ai/providers/research-settings";
 
 export type ResearchDepth = "quick" | "deep";
+
+export type ChatSubmission = { text: string; files?: FileUIPart[] };
+export type SubmissionMode = "send" | "queue" | "blocked";
+
+export function getSubmissionMode({
+  isLoading,
+  hasQueuedMessage,
+}: {
+  isLoading: boolean;
+  hasQueuedMessage: boolean;
+}): SubmissionMode {
+  if (!isLoading) return "send";
+  return hasQueuedMessage ? "blocked" : "queue";
+}
 
 export function Chat({
   id,
@@ -37,6 +51,13 @@ export function Chat({
   useRegisterActiveAgent(agentId);
   const [researchDepth, setResearchDepth] = useState<ResearchDepth>("quick");
   const [humanizerEnabled, setHumanizerEnabled] = useState(true);
+  const [queuedMessage, setQueuedMessage] = useState<ChatSubmission | null>(
+    null,
+  );
+  const queuedMessageRef = useRef<ChatSubmission | null>(null);
+  const sendMessageRef = useRef<
+    ((message: ChatSubmission) => Promise<void>) | null
+  >(null);
   const handleResearchDepthChange = useCallback((depth: ResearchDepth) => {
     setResearchDepth(depth);
   }, []);
@@ -67,8 +88,23 @@ export function Chat({
     transport,
     onFinish: () => {
       window.history.replaceState({}, "", `/chat/${id}`);
+      window.setTimeout(() => {
+        const nextMessage = queuedMessageRef.current;
+        const sendNextMessage = sendMessageRef.current;
+        if (!nextMessage || !sendNextMessage) return;
+
+        queuedMessageRef.current = null;
+        setQueuedMessage(null);
+        void sendNextMessage(nextMessage).catch(() => {
+          queuedMessageRef.current = nextMessage;
+          setQueuedMessage((current) => current ?? nextMessage);
+        });
+      }, 0);
     },
   });
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
   const [input, setInput] = useState("");
   const { data: runtimeStatus } = useSWR<WorkspaceAIRuntimeStatus>(
     `/api/ai/runtime?agentId=${encodeURIComponent(agentId)}`,
@@ -82,6 +118,29 @@ export function Chat({
 
   const [attachments, setAttachments] = useState<FileUIPart[]>([]);
   const isLoading = status === "submitted" || status === "streaming";
+  const submitMessage = useCallback(
+    (message: ChatSubmission): SubmissionMode => {
+      const mode = getSubmissionMode({
+        isLoading,
+        hasQueuedMessage: queuedMessage !== null,
+      });
+
+      if (mode === "queue") {
+        queuedMessageRef.current = message;
+        setQueuedMessage(message);
+      } else if (mode === "send") {
+        void sendMessage(message);
+      }
+
+      return mode;
+    },
+    [isLoading, queuedMessage, sendMessage],
+  );
+  const clearQueuedMessage = useCallback(() => {
+    queuedMessageRef.current = null;
+    setQueuedMessage(null);
+  }, []);
+
   const dedupedMessages = useMemo(() => {
     const seen = new Set<string>();
     return messages.filter((m) => {
@@ -161,6 +220,9 @@ export function Chat({
             setAttachments={setAttachments}
             messages={dedupedMessages}
             sendMessage={sendMessage}
+            submitMessage={submitMessage}
+            queuedMessage={queuedMessage}
+            clearQueuedMessage={clearQueuedMessage}
             thinkingProviderLabel={runtimeStatus?.thinkingProviderLabel ?? null}
             humanizerAvailable={runtimeStatus?.humanizerAvailable ?? false}
             humanizerEnabled={humanizerEnabled}
@@ -168,6 +230,7 @@ export function Chat({
             researchDepth={researchDepth}
             onResearchDepthChange={handleResearchDepthChange}
             agentName={agentName}
+            agentId={agentId}
             chatError={error}
             clearChatError={clearError}
             retryLastMessage={() => regenerate()}

@@ -2,11 +2,13 @@
 
 import {
   BrainCircuit,
+  Clock3,
   Compass,
   FileUp,
   ImagePlus,
   SlidersHorizontal,
   WandSparkles,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import React, {
@@ -23,11 +25,16 @@ import { toast } from "sonner";
 import { ChatErrorNotice } from "./chat-error-notice";
 import { ArrowUpIcon, StopIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
+import { SkillPicker, type SkillPickerHandle } from "./skill-picker";
 import useWindowSize from "./use-window-size";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 
-import type { ResearchDepth } from "./chat";
+import type {
+  ChatSubmission,
+  ResearchDepth,
+  SubmissionMode,
+} from "./chat";
 import type { ChatRequestOptions, FileUIPart, UIMessage } from "ai";
 
 const suggestedActions = [
@@ -53,6 +60,9 @@ export function MultimodalInput({
   setAttachments,
   messages,
   sendMessage,
+  submitMessage,
+  queuedMessage,
+  clearQueuedMessage,
   thinkingProviderLabel,
   humanizerAvailable,
   humanizerEnabled,
@@ -60,6 +70,7 @@ export function MultimodalInput({
   researchDepth,
   onResearchDepthChange,
   agentName,
+  agentId,
   chatError,
   clearChatError,
   retryLastMessage,
@@ -76,6 +87,9 @@ export function MultimodalInput({
     message?: { text: string; files?: FileUIPart[] },
     options?: ChatRequestOptions,
   ) => Promise<void>;
+  submitMessage: (message: ChatSubmission) => SubmissionMode;
+  queuedMessage: ChatSubmission | null;
+  clearQueuedMessage: () => void;
   thinkingProviderLabel: string | null;
   humanizerAvailable: boolean;
   humanizerEnabled: boolean;
@@ -83,11 +97,13 @@ export function MultimodalInput({
   researchDepth: ResearchDepth;
   onResearchDepthChange: (value: ResearchDepth) => void;
   agentName: string;
+  agentId: string;
   chatError?: Error;
   clearChatError: () => void;
   retryLastMessage: () => Promise<void>;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const skillPickerRef = useRef<SkillPickerHandle>(null);
   const { width } = useWindowSize();
 
   const adjustHeight = () => {
@@ -123,7 +139,12 @@ export function MultimodalInput({
     const text = input.trim();
     if (!text && attachments.length === 0) return;
 
-    void sendMessage({ text, files: attachments });
+    const submissionMode = submitMessage({ text, files: attachments });
+    if (submissionMode === "blocked") {
+      toast.info("Your next message is already queued.");
+      return;
+    }
+
     setInput("");
 
     setAttachments([]);
@@ -131,7 +152,7 @@ export function MultimodalInput({
     if (width && width > 768) {
       textareaRef.current?.focus();
     }
-  }, [aiAvailable, attachments, input, sendMessage, setAttachments, setInput, width]);
+  }, [aiAvailable, attachments, input, setAttachments, setInput, submitMessage, width]);
 
   const uploadFile = async (file: File) => {
     const formData = new FormData();
@@ -242,6 +263,34 @@ export function MultimodalInput({
           />
         ) : null}
 
+        {queuedMessage ? (
+          <div
+            className="mx-3 mt-3 flex items-center gap-2 rounded-2xl bg-primary/[0.055] px-3 py-2 text-xs text-muted-foreground"
+            role="status"
+            aria-label="Message queued to send next"
+          >
+            <Clock3 size={13} className="shrink-0 text-primary/70" aria-hidden />
+            <span className="shrink-0 font-medium text-foreground/75">
+              Queued next
+            </span>
+            <span className="min-w-0 flex-1 truncate opacity-75">
+              {queuedMessage.text ||
+                `${queuedMessage.files?.length ?? 0} attachment${
+                  queuedMessage.files?.length === 1 ? "" : "s"
+                }`}
+            </span>
+            <button
+              type="button"
+              onClick={clearQueuedMessage}
+              className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Remove queued message"
+              title="Remove queued message"
+            >
+              <X size={13} aria-hidden />
+            </button>
+          </div>
+        ) : null}
+
         {(attachments.length > 0 || uploadQueue.length > 0) && (
           <div className="flex gap-2 overflow-x-auto px-3 pb-1 pt-3">
             {attachments.map((attachment) => (
@@ -271,6 +320,13 @@ export function MultimodalInput({
           </div>
         )}
 
+        <SkillPicker
+          ref={skillPickerRef}
+          agentId={agentId}
+          input={input}
+          setInput={setInput}
+          textareaRef={textareaRef}
+        />
         <Textarea
           ref={textareaRef}
           placeholder={
@@ -284,18 +340,14 @@ export function MultimodalInput({
           className="min-h-16 max-h-[200px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-4 pb-2 pt-4 text-[15px] leading-6 shadow-none focus-visible:border-0 focus-visible:bg-transparent focus-visible:ring-0 dark:bg-transparent dark:focus-visible:bg-transparent"
           rows={2}
           onKeyDown={(event) => {
+            if (skillPickerRef.current?.handleKeyDown(event)) return;
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
 
-              if (isLoading) {
-                toast.error("Please wait for the model to finish its response!");
-              } else {
-                submitForm();
-              }
+              submitForm();
             }
           }}
         />
-
         <div className="flex min-h-12 flex-wrap items-center gap-1.5 px-2.5 pb-2.5">
           <span
             className="flex max-w-[180px] shrink items-center gap-1.5 rounded-full border border-primary/15 bg-primary/[0.07] px-2.5 py-1 text-xs text-foreground"
@@ -406,22 +458,23 @@ export function MultimodalInput({
               >
                 <StopIcon size={13} />
               </Button>
-            ) : (
-              <Button
-                type="button"
-                size="icon"
-                className="size-8 rounded-full bg-gradient-to-br from-primary to-sky-500 text-white shadow-none hover:shadow-[0_4px_16px_hsl(var(--primary)/0.35)] active:scale-[0.96]"
-                onClick={submitForm}
-                aria-label="Send message"
-                disabled={
-                  !aiAvailable ||
-                  (!input.trim() && attachments.length === 0) ||
-                  uploadQueue.length > 0
-                }
-              >
-                <ArrowUpIcon size={14} />
-              </Button>
-            )}
+            ) : null}
+            <Button
+              type="button"
+              size="icon"
+              className="size-8 rounded-full bg-gradient-to-br from-primary to-sky-500 text-white shadow-none hover:shadow-[0_4px_16px_hsl(var(--primary)/0.35)] active:scale-[0.96]"
+              onClick={submitForm}
+              aria-label={isLoading ? "Queue message" : "Send message"}
+              title={isLoading ? "Queue message" : "Send message"}
+              disabled={
+                !aiAvailable ||
+                Boolean(isLoading && queuedMessage) ||
+                (!input.trim() && attachments.length === 0) ||
+                uploadQueue.length > 0
+              }
+            >
+              <ArrowUpIcon size={14} />
+            </Button>
           </div>
         </div>
       </div>

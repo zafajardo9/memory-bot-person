@@ -4,6 +4,8 @@ import {
   Brain,
   Check,
   ChevronRight,
+  Command,
+  Layers,
   MessageCircleMore,
   Plus,
   Save,
@@ -13,9 +15,11 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { SkillManager } from "@/components/settings/skill-manager";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +31,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -124,6 +136,7 @@ export function AgentSettingsPanel({
   initialMemories: MemoryItem[];
   initialEnabledTools: string[];
 }) {
+  const searchParams = useSearchParams();
   const [settings, setSettings] = useState(initialSettings);
   const [savedSettings, setSavedSettings] = useState(initialSettings);
   const [enabledTools, setEnabledTools] = useState(initialEnabledTools);
@@ -141,9 +154,35 @@ export function AgentSettingsPanel({
     priority: 5,
   });
 
-  const [activeTab, setActiveTab] = useState<"voice" | "tools" | "memories">("voice");
+  const [activeTab, setActiveTab] = useState<
+    "voice" | "tools" | "memories" | "skills"
+  >(() => (searchParams.get("tab") === "skills" ? "skills" : "voice"));
 
   const layerId = useId();
+  const [layersOpen, setLayersOpen] = useState(false);
+
+  const addLayer = () => {
+    setSettings((current) => ({
+      ...current,
+      responseLayers: [
+        ...current.responseLayers,
+        {
+          id: `${layerId}-${current.responseLayers.length}`,
+          label: "",
+          content: "",
+        },
+      ],
+    }));
+  };
+
+  const removeLayer = (layer: ResponseLayer) => {
+    setSettings((current) => ({
+      ...current,
+      responseLayers: current.responseLayers.filter(
+        (candidate) => candidate.id !== layer.id,
+      ),
+    }));
+  };
 
   const hasChanges = useMemo(
     () =>
@@ -297,7 +336,7 @@ export function AgentSettingsPanel({
           <div className="space-y-6">
             <section className="content-surface overflow-hidden rounded-3xl">
               {/* Tab bar */}
-              <div className="m-2 flex rounded-full bg-foreground/[0.04] p-1">
+              <div className="m-2 grid grid-cols-2 gap-1 rounded-2xl bg-foreground/[0.04] p-1 sm:grid-cols-4 sm:rounded-full">
                 <button
                   type="button"
                   onClick={() => setActiveTab("voice")}
@@ -336,6 +375,18 @@ export function AgentSettingsPanel({
                   <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                     {memories.length}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("skills")}
+                  className={`flex-1 rounded-full px-3 py-2.5 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${
+                    activeTab === "skills"
+                      ? "bg-white/80 text-foreground dark:bg-white/[0.08]"
+                      : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
+                  }`}
+                >
+                  <Command size={15} className="mr-2 inline" />
+                  Skills
                 </button>
               </div>
 
@@ -465,122 +516,51 @@ export function AgentSettingsPanel({
                   </p>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-end justify-between gap-4">
-                    <div>
-                      <h3 className="text-sm font-medium">Response layers</h3>
-                      <p className="text-xs text-muted-foreground">
+                <div className="rounded-xl border bg-muted/20 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-medium">Response layers</h3>
+                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+                          {settings.responseLayers.length}/20
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
                         Structure how the agent breaks down its answers — add
                         labels like Summarization, Details, or Related Keywords
                         with instructions for each.
                       </p>
-                    </div>
-                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                      {settings.responseLayers.length}/20
-                    </span>
-                  </div>
-
-                  {settings.responseLayers.length > 0 ? (
-                    <div className="space-y-3">
-                      {settings.responseLayers.map((layer, index) => (
-                        <div
-                          key={layer.id}
-                          className="group relative rounded-xl border bg-muted/30 p-4"
-                        >
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSettings((current) => ({
-                                ...current,
-                                responseLayers: current.responseLayers.filter(
-                                  (l) => l.id !== layer.id,
-                                ),
-                              }))
-                            }
-                            className="absolute top-2 right-2 rounded-md p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                            aria-label={`Remove ${layer.label || "layer"}`}
-                          >
-                            <X size={14} />
-                          </button>
-                          <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
-                            <Input
-                              value={layer.label}
-                              maxLength={80}
-                              onChange={(event) =>
-                                setSettings((current) => {
-                                  const updated = [...current.responseLayers];
-                                  updated[index] = {
-                                    ...updated[index],
-                                    label: event.target.value,
-                                  };
-                                  return {
-                                    ...current,
-                                    responseLayers: updated,
-                                  };
-                                })
-                              }
-                              placeholder="Summarization"
-                              className="h-9 rounded-lg text-sm"
-                            />
-                            <Textarea
-                              value={layer.content}
-                              maxLength={2000}
-                              rows={2}
-                              onChange={(event) =>
-                                setSettings((current) => {
-                                  const updated = [...current.responseLayers];
-                                  updated[index] = {
-                                    ...updated[index],
-                                    content: event.target.value,
-                                  };
-                                  return {
-                                    ...current,
-                                    responseLayers: updated,
-                                  };
-                                })
-                              }
-                              placeholder="Start with a 2–3 sentence summary before diving into details."
-                              className="resize-y rounded-lg text-sm"
-                            />
-                          </div>
+                      {settings.responseLayers.length > 0 ? (
+                        <div className="mt-2.5 flex flex-wrap gap-1.5">
+                          {settings.responseLayers.slice(0, 5).map((layer) => (
+                            <span
+                              key={layer.id}
+                              className="max-w-full truncate rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                            >
+                              {layer.label.trim() || "Untitled layer"}
+                            </span>
+                          ))}
+                          {settings.responseLayers.length > 5 ? (
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                              +{settings.responseLayers.length - 5} more
+                            </span>
+                          ) : null}
                         </div>
-                      ))}
+                      ) : null}
                     </div>
-                  ) : (
-                    <div className="rounded-xl border border-dashed py-8 text-center">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        No response layers yet
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Add structured guidelines like Summarization, Details,
-                        or Related Keywords.
-                      </p>
-                    </div>
-                  )}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={settings.responseLayers.length >= 20}
-                    onClick={() =>
-                      setSettings((current) => ({
-                        ...current,
-                        responseLayers: [
-                          ...current.responseLayers,
-                          {
-                            id: `${layerId}-${current.responseLayers.length}`,
-                            label: "",
-                            content: "",
-                          },
-                        ],
-                      }))
-                    }
-                    className="rounded-lg"
-                  >
-                    <Plus size={14} />
-                    Add layer
-                  </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLayersOpen(true)}
+                      className="shrink-0 gap-1.5 rounded-lg"
+                    >
+                      <Layers size={14} />
+                      {settings.responseLayers.length > 0
+                        ? "Manage layers"
+                        : "Add layers"}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex justify-end border-t pt-5">
@@ -841,6 +821,7 @@ export function AgentSettingsPanel({
                 )}
               </div>
               )}
+              {activeTab === "skills" ? <SkillManager /> : null}
             </section>
           </div>
 
@@ -906,6 +887,108 @@ export function AgentSettingsPanel({
           </aside>
         </div>
       </div>
+
+      <Dialog open={layersOpen} onOpenChange={setLayersOpen}>
+        <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto">
+          <DialogHeader className="border-b px-5 py-6 pr-16 sm:px-7">
+            <DialogTitle>Response layers</DialogTitle>
+            <DialogDescription>
+              Structure how the agent breaks down its answers — add labels like
+              Summarization, Details, or Related Keywords with instructions for
+              each. Layers apply on top of the voice settings above.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 p-5 sm:px-7 sm:py-6">
+            {settings.responseLayers.length > 0 ? (
+              settings.responseLayers.map((layer, index) => (
+                <div
+                  key={layer.id}
+                  className="group relative rounded-xl border bg-muted/30 p-4"
+                >
+                  <button
+                    type="button"
+                    onClick={() => removeLayer(layer)}
+                    className="absolute top-2 right-2 z-10 rounded-md p-1 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Remove ${layer.label || "layer"}`}
+                  >
+                    <X size={14} />
+                  </button>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
+                    <Input
+                      value={layer.label}
+                      maxLength={80}
+                      onChange={(event) =>
+                        setSettings((current) => {
+                          const updated = [...current.responseLayers];
+                          updated[index] = {
+                            ...updated[index],
+                            label: event.target.value,
+                          };
+                          return {
+                            ...current,
+                            responseLayers: updated,
+                          };
+                        })
+                      }
+                      placeholder="Summarization"
+                      className="h-9 rounded-lg text-sm"
+                    />
+                    <Textarea
+                      value={layer.content}
+                      maxLength={2000}
+                      rows={2}
+                      onChange={(event) =>
+                        setSettings((current) => {
+                          const updated = [...current.responseLayers];
+                          updated[index] = {
+                            ...updated[index],
+                            content: event.target.value,
+                          };
+                          return {
+                            ...current,
+                            responseLayers: updated,
+                          };
+                        })
+                      }
+                      placeholder="Start with a 2–3 sentence summary before diving into details."
+                      className="resize-y rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed py-8 text-center">
+                <p className="text-sm font-medium text-muted-foreground">
+                  No response layers yet
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Add structured guidelines like Summarization, Details, or
+                  Related Keywords.
+                </p>
+              </div>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={settings.responseLayers.length >= 20}
+              onClick={addLayer}
+              className="rounded-lg"
+            >
+              <Plus size={14} />
+              Add layer
+            </Button>
+          </div>
+
+          <DialogFooter className="border-t bg-muted/25 px-5 py-4 sm:px-7">
+            <Button type="button" onClick={() => setLayersOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={Boolean(deleteTarget)}

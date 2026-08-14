@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   resolveWorkspaceHumanizerModel: vi.fn(),
   createChatTools: vi.fn(),
   getAgentForUserDetailed: vi.fn(),
+  getUserSkillBySlug: vi.fn(),
+  incrementSkillUsage: vi.fn(),
 }));
 
 vi.mock("@/ai/providers/service", () => ({
@@ -29,6 +31,10 @@ vi.mock("@/ai/prompts/company-assistant", () => ({
 vi.mock("@/db/agent-queries", () => ({
   getAgentForUserDetailed: mocks.getAgentForUserDetailed,
 }));
+vi.mock("@/db/skill-queries", () => ({
+  getUserSkillBySlug: mocks.getUserSkillBySlug,
+  incrementSkillUsage: mocks.incrementSkillUsage,
+}));
 vi.mock("@/lib/knowledge/config", () => ({
   isKnowledgeChatEnabled: () => false,
 }));
@@ -40,6 +46,7 @@ vi.mock("@/lib/agents", () => ({
   toolEnabled: () => false,
 }));
 vi.mock("@/lib/agent-settings", () => ({
+  escapePromptData: (value: string) => value,
   formatAgentSettingsForPrompt: () => "",
 }));
 vi.mock("@/lib/web/consent", () => ({
@@ -95,6 +102,66 @@ describe("provider-role chat orchestration", () => {
     mocks.createChatTools.mockResolvedValue({});
     mocks.getAgentForUserDetailed.mockResolvedValue({ enabledTools: [] });
     mocks.resolveWorkspaceHumanizerModel.mockResolvedValue(null);
+    mocks.getUserSkillBySlug.mockResolvedValue(null);
+    mocks.incrementSkillUsage.mockResolvedValue(undefined);
+  });
+
+  it("resolves and applies an owned slash-command skill in chat", async () => {
+    const writerModel = streamingModel("writer-provider", "writer", "SKILLED_ANSWER");
+    mocks.resolveWorkspaceResearchModel.mockResolvedValue(null);
+    mocks.resolveUserLanguageModel.mockResolvedValue({
+      providerId: "writer-provider",
+      modelId: "writer",
+      model: writerModel,
+    });
+    mocks.getUserSkillBySlug.mockResolvedValue({
+      id: "skill-id",
+      slug: "brief",
+      name: "Executive brief",
+      instructions: "Start with the decision and use three bullets.",
+      enabled: true,
+    });
+
+    const { result, appliedSkill } = await streamCompanyChat({
+      chatId: "chat-id",
+      userId: "user-id",
+      agentId: "agent-id",
+      messages: [
+        {
+          id: "user-message",
+          role: "user",
+          parts: [{ type: "text", text: "/brief Q3 revenue" }],
+        },
+      ],
+      humanizerEnabled: false,
+    });
+    const body = await result
+      .toUIMessageStreamResponse({
+        messageMetadata: () => ({ appliedSkill: appliedSkill! }),
+      })
+      .text();
+
+    expect(body).toContain("SKILLED_ANSWER");
+    expect(body).toContain('"slug":"brief"');
+    expect(appliedSkill).toEqual({
+      id: "skill-id",
+      slug: "brief",
+      name: "Executive brief",
+    });
+    expect(mocks.getUserSkillBySlug).toHaveBeenCalledWith("user-id", "brief");
+    expect(mocks.incrementSkillUsage).toHaveBeenCalledWith("user-id", "skill-id");
+    expect(writerModel.doStreamCalls[0].prompt).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "system",
+          content: expect.stringContaining("Start with the decision and use three bullets."),
+        }),
+        expect.objectContaining({
+          role: "user",
+          content: expect.not.stringContaining("/brief"),
+        }),
+      ]),
+    );
   });
 
   it("runs Thinking first, hides its narrative, and streams the Humanizer answer", async () => {

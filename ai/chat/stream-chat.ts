@@ -8,6 +8,7 @@ import {
   type UIMessage,
   type UIMessageChunk,
   type UIMessageStreamOnFinishCallback,
+  type UIMessageStreamOptions,
   wrapLanguageModel,
 } from "ai";
 
@@ -20,15 +21,29 @@ import {
 import { resolveUserLanguageModel } from "@/ai/providers/service";
 import { createChatTools } from "@/ai/tools";
 import { getAgentForUserDetailed } from "@/db/agent-queries";
+import {
+  getUserSkillBySlug,
+  incrementSkillUsage,
+} from "@/db/skill-queries";
 import { formatAgentSettingsForPrompt } from "@/lib/agent-settings";
 import { agentSettingsFromProfile, toolEnabled } from "@/lib/agents";
 import { isKnowledgeChatEnabled } from "@/lib/knowledge/config";
 import { searchCompanyKnowledge } from "@/lib/knowledge/retrieval";
 import {
+  formatSkillInstructionsForPrompt,
+  isChatSkillsEnabled,
+  parseSlashSkill,
+  stripLeadingSkillCommand,
+  type AppliedSkill,
+  type ChatMessageMetadata,
+} from "@/lib/skills";
+import {
   hasWebResearchConsent,
   linkToolPlan,
   webResearchInstruction,
 } from "@/lib/web/consent";
+
+type ChatUIMessage = UIMessage<ChatMessageMetadata>;
 
 function latestUserText(messages: UIMessage[]) {
   const latest = [...messages].reverse().find((message) => message.role === "user");
@@ -38,6 +53,37 @@ function latestUserText(messages: UIMessage[]) {
     .map((part) => (part.type === "text" ? part.text : ""))
     .join("\n")
     .trim();
+}
+
+async function resolveTurnSkill(
+  messages: ChatUIMessage[],
+  userId: string,
+): Promise<{
+  messages: ChatUIMessage[];
+  appliedSkill?: AppliedSkill;
+  skillPrompt: string;
+}> {
+  if (!isChatSkillsEnabled()) return { messages, skillPrompt: "" };
+  const parsed = parseSlashSkill(latestUserText(messages));
+  if (!parsed) return { messages, skillPrompt: "" };
+
+  try {
+    const skill = await getUserSkillBySlug(userId, parsed.slug);
+    if (!skill?.enabled) return { messages, skillPrompt: "" };
+
+    const appliedSkill = { id: skill.id, slug: skill.slug, name: skill.name };
+    void incrementSkillUsage(userId, skill.id).catch((error) => {
+      console.error("Failed to increment skill usage", error);
+    });
+    return {
+      messages: stripLeadingSkillCommand(messages, skill.slug),
+      appliedSkill,
+      skillPrompt: formatSkillInstructionsForPrompt(skill),
+    };
+  } catch (error) {
+    console.error("Chat skill resolution failed", error);
+    return { messages, skillPrompt: "" };
+  }
 }
 
 async function knowledgePreflight(
@@ -80,11 +126,12 @@ async function knowledgePreflight(
 }
 
 interface ChatStreamResponseOptions {
-  originalMessages?: UIMessage[];
+  originalMessages?: ChatUIMessage[];
   sendReasoning?: boolean;
   sendSources?: boolean;
   onError?: (error: unknown) => string;
-  onFinish?: UIMessageStreamOnFinishCallback<UIMessage>;
+  onFinish?: UIMessageStreamOnFinishCallback<ChatUIMessage>;
+  messageMetadata?: UIMessageStreamOptions<ChatUIMessage>["messageMetadata"];
 }
 
 function isResearchNarrativeChunk(chunk: UIMessageChunk) {
@@ -100,16 +147,18 @@ function isResearchNarrativeChunk(chunk: UIMessageChunk) {
 
 export async function streamCompanyChat(input: {
   chatId: string;
-  messages: UIMessage[];
+  messages: ChatUIMessage[];
   userId: string;
   agentId: string;
   researchDepth?: string;
   humanizerEnabled?: boolean;
 }) {
-  const userText = latestUserText(input.messages);
+  const turnSkill = await resolveTurnSkill(input.messages, input.userId);
+  const messages = turnSkill.messages;
+  const userText = latestUserText(messages);
   const isDeepMode = input.researchDepth === "deep";
   const webAccessApproved =
-    hasWebResearchConsent(input.messages) || isDeepMode;
+    hasWebResearchConsent(messages) || isDeepMode;
   const agent = await getAgentForUserDetailed(input.agentId, input.userId);
   if (!agent) throw new Error("Agent not found.");
   const humanizerRequested = input.humanizerEnabled !== false;
@@ -124,12 +173,12 @@ export async function streamCompanyChat(input: {
     (await resolveUserLanguageModel(input.userId, input.agentId));
   const agentSettings = agentSettingsFromProfile(agent);
   const modelMessages = (
-    await convertToModelMessages(input.messages, {
+    await convertToModelMessages(messages, {
       ignoreIncompleteToolCalls: true,
     })
   ).filter((message) => message.content.length > 0);
   const preflight = await knowledgePreflight(
-    input.messages,
+    messages,
     input.userId,
     input.chatId,
     input.agentId,
@@ -162,7 +211,7 @@ export async function streamCompanyChat(input: {
     webSearch: "webSearch" in tools,
   });
 
-  const system = `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText, isDeepMode)}\n\n${formatAgentSettingsForPrompt(agentSettings)}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`;
+  const system = `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText, isDeepMode)}\n\n${formatAgentSettingsForPrompt(agentSettings)}${turnSkill.skillPrompt ? `\n\n${turnSkill.skillPrompt}` : ""}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`;
   const prepareStep = ({ stepNumber }: { stepNumber: number }) => {
     if (stepNumber === 0 && linkPlan.reader) {
       return {
@@ -197,7 +246,7 @@ export async function streamCompanyChat(input: {
     ? {
         toUIMessageStreamResponse(options: ChatStreamResponseOptions = {}) {
           const onError = options.onError ?? (() => "An error occurred.");
-          const stream = createUIMessageStream<UIMessage>({
+          const stream = createUIMessageStream<ChatUIMessage>({
             originalMessages: options.originalMessages,
             onError,
             onFinish: options.onFinish,
@@ -215,15 +264,19 @@ export async function streamCompanyChat(input: {
                 },
               });
               const researchUIStream = researchResult
-                .toUIMessageStream({
+                .toUIMessageStream<ChatUIMessage>({
                   sendStart: true,
                   sendFinish: false,
                   sendReasoning: false,
                   sendSources: options.sendSources,
+                  messageMetadata: options.messageMetadata,
                   onError,
                 })
                 .pipeThrough(
-                  new TransformStream<UIMessageChunk, UIMessageChunk>({
+                  new TransformStream<
+                    UIMessageChunk<ChatMessageMetadata>,
+                    UIMessageChunk<ChatMessageMetadata>
+                  >({
                     transform(chunk, controller) {
                       if (!isResearchNarrativeChunk(chunk)) controller.enqueue(chunk);
                     },
@@ -242,11 +295,12 @@ export async function streamCompanyChat(input: {
                 },
               });
               writer.merge(
-                writerResult.toUIMessageStream({
+                writerResult.toUIMessageStream<ChatUIMessage>({
                   sendStart: false,
                   sendFinish: true,
                   sendReasoning: options.sendReasoning,
                   sendSources: options.sendSources,
+                  messageMetadata: options.messageMetadata,
                   onError,
                 }),
               );
@@ -262,5 +316,6 @@ export async function streamCompanyChat(input: {
     selection: selected,
     extractionModel: writerModel,
     memoryEnabled: toolEnabled(agent.enabledTools, "memory"),
+    appliedSkill: turnSkill.appliedSkill,
   };
 }

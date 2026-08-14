@@ -16,8 +16,10 @@ work progresses instead of improvising around it.
 | Plan | Status | Summary |
 | --- | --- | --- |
 | [`plans/answer-humanizer-flow/PLAN.md`](plans/answer-humanizer-flow/PLAN.md) | Implemented | Removes provider/model selection from chat; adds read-only Thinking-provider status and an optional workspace end-processor Humanizer pass. |
+| [`plans/chat-thinking-queue/PLAN.md`](plans/chat-thinking-queue/PLAN.md) | Implemented | Simplifies the thinking trace and adds a client-side queued message while an answer is generating. |
 | [`plans/ai-provider-roles/PLAN.md`](plans/ai-provider-roles/PLAN.md) | Implemented | Dedicated workspace-wide research model for tool calling. Its user-selected writer behavior was later superseded by `answer-humanizer-flow`. |
 | [`plans/ai-settings-redesign/PLAN.md`](plans/ai-settings-redesign/PLAN.md) | Implemented | Redesigns `/settings/ai` as a responsive AI control room with clearer provider management and workspace role flow. |
+| [`plans/chat-user-skills/PLAN.md`](plans/chat-user-skills/PLAN.md) | Implemented | Per-user **chat skills**: `/slug` slash commands that inject user-authored instruction templates for a single turn. Composer picker, owner-scoped CRUD, server-side injection. |
 | [`plans/company-knowledge-base/PLAN.md`](plans/company-knowledge-base/PLAN.md) | Planning | Company knowledge base with grounded AI tool calling. |
 | [`plans/framework-upgrade/PLAN.md`](plans/framework-upgrade/PLAN.md) | Planning | Framework, technology, and dependency upgrade. |
 | [`plans/sustainable-memory-context/PLAN.md`](plans/sustainable-memory-context/PLAN.md) | Planning | Sustainable memory, context, and knowledge implementation. |

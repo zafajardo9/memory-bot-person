@@ -41,6 +41,8 @@ The original weather and demonstration flight-booking tools remain available for
   middleware-based recall
 - Per-user agent profiles for display name, mood, answer length, custom behavior,
   and visual memory management at `/settings/agent`
+- Private per-user chat skills: reusable one-turn instructions called with
+  `/command your request` from the composer
 - Optional structured automatic memory extraction from completed turns
 - Responsive light and dark themes
 
@@ -109,6 +111,7 @@ USER_MEMORY_ENABLED=true
 USER_MEMORY_MAX_ENTRIES=200
 USER_MEMORY_CACHE_TTL_MS=30000
 AUTO_MEMORY_ENABLED=false
+CHAT_SKILLS_ENABLED=true
 ```
 
 `POSTGRES_URL` may be a direct `postgres://`/`postgresql://` URL or a Prisma Accelerate `prisma+postgres://` URL. Direct URLs use the Prisma `pg` adapter; Accelerate URLs use the Prisma Accelerate client extension. When Accelerate is used, set `DIRECT_DATABASE_URL` to the database's direct connection string for migration commands.
@@ -170,6 +173,14 @@ and injects the top memories before every model step. `AUTO_MEMORY_ENABLED` is
 intentionally opt-in because it adds a structured model call after each
 completed chat turn. Automatic extraction stores only high-confidence,
 non-sensitive durable context. `USER_MEMORY_MAX_ENTRIES` defaults to 200.
+
+Chat skills are private instruction templates managed from the **Skills** tab in
+an agent's settings. Type `/` at the start of a chat message to open the skill
+picker, or call one directly with `/slug your request`. The server resolves only
+enabled skills owned by the signed-in user, removes the command before sending
+the request to the model, and applies the escaped instructions for that turn.
+Unknown or disabled commands remain ordinary message text. Skills are available
+by default; set `CHAT_SKILLS_ENABLED=false` for an emergency rollback.
 
 Never commit `.env.local`. Generate an Auth.js secret with `openssl rand -base64 32`.
 
@@ -259,6 +270,7 @@ ai/
   knowledge-tools.ts       Search/read/list tool definitions
   prompts/                 Source-first company assistant contract
 components/
+  custom/skill-picker.tsx  Slash-command skill discovery in the chat composer
   knowledge/               Shared notebook and citation interfaces
   settings/                Agent and provider settings interfaces
 db/
@@ -266,10 +278,12 @@ db/
   queries.ts               Prisma user/chat/reservation persistence
   knowledge-queries.ts     Knowledge lifecycle persistence
   memory-queries.ts        User-scoped memory persistence
+  skill-queries.ts         User-scoped chat skill CRUD and usage tracking
 lib/
   knowledge/               Extraction, security, chunking, embeddings, retrieval
   memory/                  Feature flags, cache, and prompt preflight
   agent-settings.ts        Agent profile validation, defaults, and prompt formatting
+  skills.ts                Chat skill validation, slash parsing, and prompt boundaries
   web/                     Tavily registry, quota, and safe page extraction
   prisma.ts                Direct PostgreSQL and Accelerate client selection
 prisma/
@@ -296,6 +310,8 @@ All routes require authentication. Members may list and contribute sources and m
 | `/api/ai/selection` | `GET`, `PUT` | Read the provider catalog or save the current user's provider/model choice. |
 | `/api/ai/workspace` | `GET`, `PUT` | Read or save workspace Thinking and Humanizer models (admin only). |
 | `/api/ai/runtime` | `GET` | Read safe Thinking/Humanizer availability for the authenticated chat composer. |
+| `/api/ai/skills` | `GET`, `POST` | List or create the signed-in user's chat skills. |
+| `/api/ai/skills/:id` | `PATCH`, `DELETE` | Update or delete an owned chat skill. |
 | `/api/ai/knowledge` | `GET`, `PUT` | Read or save the workspace knowledge-embedding model (admin only). |
 
 ## Data lifecycle

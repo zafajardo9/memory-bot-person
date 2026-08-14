@@ -151,13 +151,13 @@ export function ResearchAISettingsPanel({
       className="overflow-hidden rounded-3xl border bg-background/75 shadow-sm"
       aria-labelledby="workspace-ai-flow-heading"
     >
-      <header className="bg-primary p-5 text-primary-foreground sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
-              <Workflow size={19} />
-            </span>
-            <div>
+      <header className="px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Workflow size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h3
                   id="workspace-ai-flow-heading"
@@ -165,23 +165,29 @@ export function ResearchAISettingsPanel({
                 >
                   Answer pipeline
                 </h3>
-                <span className="rounded-full bg-white/15 px-2 py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0.14em]">
+                <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   Workspace-wide
                 </span>
               </div>
-              <p className="mt-1 max-w-2xl text-sm leading-5 text-primary-foreground/75">
-                One model investigates with tools. A second model shapes the
-                final response without direct tool access.
-              </p>
+              <span
+                className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                  thinkingReady && humanizerReady
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-amber-600 dark:text-amber-400"
+                }`}
+              >
+                <span
+                  className={`size-2 rounded-full ${
+                    thinkingReady && humanizerReady ? "bg-emerald-500" : "bg-amber-500"
+                  }`}
+                />
+                {thinkingReady && humanizerReady ? "Pipeline ready" : "Needs attention"}
+              </span>
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <span
-              className={`size-2 rounded-full ${
-                thinkingReady && humanizerReady ? "bg-emerald-300" : "bg-amber-300"
-              }`}
-            />
-            {thinkingReady && humanizerReady ? "Pipeline ready" : "Needs attention"}
+            <p className="mt-1 max-w-xl text-sm leading-6 text-muted-foreground">
+              One model investigates with tools. A second model shapes the
+              final response without direct tool access.
+            </p>
           </div>
         </div>
       </header>
