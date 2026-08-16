@@ -15,6 +15,7 @@ import {
   Trash2,
   Wrench,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
 
 import { AuthorizePayment } from "@/components/flights/authorize-payment";
@@ -560,6 +561,28 @@ function researchSummary(tools: ActivityToolPart[]) {
   return { notebookSources, webSources, researchingNow };
 }
 
+function ElapsedSeconds() {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    // Mounts fresh on each activation, so elapsed already starts at 0.
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <span
+      className="font-mono text-[11px] tabular-nums text-muted-foreground/70"
+      aria-hidden
+    >
+      {elapsed}s
+    </span>
+  );
+}
+
 export function AssistantActivity({
   chatId,
   reasoning,
@@ -601,6 +624,7 @@ export function AssistantActivity({
             <Check size={13} className="text-primary/70" />
           )}
           <span>{headerLabel}</span>
+          {isActive ? <ElapsedSeconds /> : null}
           <ChevronDown
             size={12}
             className="transition-transform group-open/work:rotate-180"

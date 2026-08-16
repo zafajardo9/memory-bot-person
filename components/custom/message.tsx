@@ -7,9 +7,20 @@ import {
   isToolUIPart,
   type UIMessage,
 } from "ai";
-import { Check, Command, Copy, Paperclip, ThumbsDown, ThumbsUp } from "lucide-react";
-import { useCallback, useState } from "react";
+import {
+  Check,
+  Command,
+  Copy,
+  Paperclip,
+  Pencil,
+  RefreshCw,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+
+import { buildCitationRegistry } from "@/lib/ai/citations";
 
 import { AssistantActivity } from "./assistant-activity";
 import { ChatMarkdown } from "./chat-markdown";
@@ -19,7 +30,7 @@ import { PreviewAttachment } from "./preview-attachment";
 
 import type { ChatMessageMetadata } from "@/lib/skills";
 
-export const Message = ({
+export const Message = memo(function Message({
   chatId,
   message,
   agentName,
@@ -27,6 +38,8 @@ export const Message = ({
   onSelectFollowUp,
   showFollowUps = false,
   userMessage,
+  onRegenerate,
+  onEditMessage,
 }: {
   chatId: string;
   message: UIMessage;
@@ -35,7 +48,9 @@ export const Message = ({
   onSelectFollowUp: (question: string) => Promise<void>;
   showFollowUps?: boolean;
   userMessage: string;
-}) => {
+  onRegenerate?: () => void;
+  onEditMessage?: (message: UIMessage, text: string) => void;
+}) {
   const { role } = message;
   const content = message.parts
     .filter(isTextUIPart)
@@ -53,6 +68,22 @@ export const Message = ({
 
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<1 | -1 | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState("");
+
+  // Resolve 【…】 citations in this answer to the evidence cards its
+  // knowledge searches produced. Anchors exist only for completed tools.
+  const citationRegistry = useMemo(
+    () => {
+      if (!isAssistant) return undefined;
+      const completed = message.parts
+        .filter(isToolUIPart)
+        .filter((part) => part.state === "output-available")
+        .map((part) => part.output);
+      return buildCitationRegistry(completed);
+    },
+    [isAssistant, message],
+  );
 
   // Attribute feedback to the most recent knowledge search in this answer.
   const queryLogId = (() => {
@@ -97,6 +128,18 @@ export const Message = ({
     }
   }, [content]);
 
+  const startEditing = useCallback(() => {
+    setEditDraft(content);
+    setIsEditing(true);
+  }, [content]);
+
+  const submitEdit = useCallback(() => {
+    const nextText = editDraft.trim();
+    if (!nextText || !onEditMessage) return;
+    setIsEditing(false);
+    onEditMessage(message, nextText);
+  }, [editDraft, message, onEditMessage]);
+
   const copyButton = (
     <button
       onClick={handleCopy}
@@ -108,9 +151,21 @@ export const Message = ({
     </button>
   );
 
+  const regenerateButton = onRegenerate ? (
+    <button
+      type="button"
+      onClick={onRegenerate}
+      className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] text-muted-foreground opacity-100 transition-[background-color,color,opacity] hover:bg-foreground/[0.05] hover:text-foreground sm:opacity-0 sm:group-hover/message:opacity-100"
+      aria-label="Regenerate answer"
+    >
+      <RefreshCw size={12} />
+      Retry
+    </button>
+  ) : null;
+
   return (
     <article
-      className="group/message flex w-full max-w-3xl flex-row gap-3 px-4 first-of-type:pt-20 sm:gap-4 sm:px-0"
+      className="group/message flex w-full max-w-3xl animate-in flex-row gap-3 px-4 fade-in slide-in-from-bottom-1 duration-300 first-of-type:pt-20 sm:gap-4 sm:px-0"
     >
       <div
         className={`flex size-6 shrink-0 items-center justify-center rounded-full ${
@@ -151,7 +206,49 @@ export const Message = ({
           </div>
         ) : null}
 
-        {!isAssistant && content ? (
+        {!isAssistant && isEditing ? (
+          <div className="flex flex-col gap-2 rounded-[20px] rounded-tr-md border border-primary/30 bg-primary/[0.07] px-4 py-3 dark:bg-primary/[0.12]">
+            <textarea
+              value={editDraft}
+              onChange={(event) => setEditDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setIsEditing(false);
+                } else if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submitEdit();
+                }
+              }}
+              rows={Math.min(8, Math.max(2, editDraft.split("\n").length))}
+              className="w-full resize-none bg-transparent text-[15px] leading-6 text-foreground outline-none"
+              aria-label="Edit your message"
+              autoFocus
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground">
+                Resending replaces the messages after this one
+              </span>
+              <span className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="rounded-full px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitEdit}
+                  disabled={!editDraft.trim()}
+                  className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Resend
+                </button>
+              </span>
+            </div>
+          </div>
+        ) : !isAssistant && content ? (
           <div className="flex flex-col gap-3 rounded-[20px] rounded-tr-md bg-primary/[0.07] px-4 py-2.5 leading-6 text-foreground dark:bg-primary/[0.12]">
             <ChatMarkdown>{content}</ChatMarkdown>
           </div>
@@ -172,8 +269,10 @@ export const Message = ({
             aria-label="Assistant answer"
             className={reasoning.length > 0 || toolInvocations.length > 0 || sources.length > 0 ? "pt-1" : ""}
           >
-            <div className="min-w-0 text-foreground">
-              <ChatMarkdown streaming={isActive}>{content}</ChatMarkdown>
+            <div className={`min-w-0 text-foreground ${isActive ? "streaming-caret" : ""}`}>
+              <ChatMarkdown streaming={isActive} citationRegistry={citationRegistry}>
+                {content}
+              </ChatMarkdown>
             </div>
           </section>
         ) : null}
@@ -192,9 +291,10 @@ export const Message = ({
         {isAssistant && content ? (
           <div className="flex items-center gap-1">
             {copyButton}
+            {regenerateButton}
             {queryLogId && !isActive ? (
               <>
-              <button
+                <button
                   type="button"
                   onClick={() => handleFeedback(1)}
                   disabled={feedback !== null}
@@ -236,8 +336,23 @@ export const Message = ({
           />
         ) : null}
 
-        {!isAssistant && content ? copyButton : null}
+        {!isAssistant && content && !isEditing ? (
+          <div className="flex items-center gap-1">
+            {copyButton}
+            {onEditMessage ? (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] text-muted-foreground opacity-100 transition-[background-color,color,opacity] hover:bg-foreground/[0.05] hover:text-foreground sm:opacity-0 sm:group-hover/message:opacity-100"
+                aria-label="Edit and resend message"
+              >
+                <Pencil size={12} />
+                Edit
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
   );
-};
+});

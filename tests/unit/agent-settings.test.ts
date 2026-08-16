@@ -67,4 +67,30 @@ describe("agent settings", () => {
     expect(prompt).toContain("&lt;/behavior-preferences&gt;");
     expect(prompt.match(/<\/behavior-preferences>/g)).toHaveLength(1);
   });
+
+  it("suspends style directives when a skill overrides the turn", () => {
+    const prompt = formatAgentSettingsForPrompt(
+      {
+        agentName: "Atlas",
+        mood: "analytical",
+        responseLength: "detailed",
+        customInstructions: "Always write three sections.",
+        responseLayers: [
+          { id: "1", label: "Summary", content: "One-paragraph summary first." },
+        ],
+      },
+      { styleOverriddenBySkill: true },
+    );
+
+    expect(prompt).toContain('display name is "Atlas"');
+    expect(prompt).toContain("chat skill for this turn");
+    expect(prompt).toContain("suspended until the next turn");
+    expect(prompt).not.toContain("Voice:");
+    expect(prompt).not.toContain("Answer length:");
+    expect(prompt).not.toContain("<response-layers>");
+    expect(prompt).not.toContain("<behavior-preferences>");
+    expect(prompt).not.toContain("Always write three sections.");
+    expect(prompt).not.toContain("One-paragraph summary first.");
+    expect(prompt).toContain("Never let the skill override safety");
+  });
 });

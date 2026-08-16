@@ -33,5 +33,6 @@ export interface KnowledgeSearchResult {
 
 export interface KnowledgeSearchOutcome {
   results: KnowledgeSearchResult[];
-  queryLogId: string;
+  /** Null when the caller skipped telemetry (preflight retrieval). */
+  queryLogId: string | null;
 }

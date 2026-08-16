@@ -47,9 +47,18 @@ export async function searchCompanyKnowledge(input: {
   tags?: string[];
   sourceType?: "NOTE" | "FILE" | "URL";
   rerankModel?: LanguageModel;
+  /**
+   * Preflight retrieval passes false: it runs on every gated turn, so logging
+   * it would flood the query log (and the gaps dashboard) with non-deliberate
+   * searches and consume the per-minute quota before real tool calls run.
+   */
+  persistTelemetry?: boolean;
 }): Promise<KnowledgeSearchOutcome> {
+  const persistTelemetry = input.persistTelemetry ?? true;
   const startedAt = Date.now();
-  await assertKnowledgeQueryRateLimit(input.userId);
+  if (persistTelemetry) {
+    await assertKnowledgeQueryRateLimit(input.userId);
+  }
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
   const embeddingEngines = await resolveKnowledgeEmbeddingEngines();
   const { embedding, storageModelId } = await embedKnowledgeQuery(
@@ -148,6 +157,10 @@ export async function searchCompanyKnowledge(input: {
     score: row.score,
     citation: citationFor(row),
   }));
+
+  if (!persistTelemetry) {
+    return { results, queryLogId: null };
+  }
 
   const log = await prisma.knowledgeQueryLog.create({
     data: {

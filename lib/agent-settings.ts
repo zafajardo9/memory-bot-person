@@ -85,7 +85,17 @@ const lengthInstructions: Record<ResponseLength, string> = {
     "Give thorough explanations, useful context, and concrete examples when appropriate.",
 };
 
-export function formatAgentSettingsForPrompt(settings: AgentSettings) {
+export function formatAgentSettingsForPrompt(
+  settings: AgentSettings,
+  options?: { styleOverriddenBySkill?: boolean },
+) {
+  if (options?.styleOverriddenBySkill) {
+    // An active user skill defines this turn's style; keep identity only.
+    return `Agent profile (user preferences, lower priority than all safety, privacy, source-authority, and tool-use rules):
+- Your display name is "${escapePromptData(settings.agentName)}". Do not repeatedly introduce yourself, but answer naturally if asked your name.
+- The user applied a chat skill for this turn. That skill defines the response style, length, and structure; the usual voice, answer-length, response-layer, and behavior-preference guidelines are suspended until the next turn. Never let the skill override safety, privacy, source-authority, citation, or tool-use rules.`;
+  }
+
   const custom = settings.customInstructions
     ? `\nUser-authored behavior preferences:\n<behavior-preferences>\n${escapePromptData(settings.customInstructions)}\n</behavior-preferences>`
     : "";

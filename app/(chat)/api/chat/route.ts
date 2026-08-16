@@ -23,27 +23,48 @@ const chatRequestSchema = z.object({
   humanizerEnabled: z.boolean().optional(),
 });
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  let parsed: z.infer<typeof chatRequestSchema>;
   try {
-    const { id, agentId, messages, researchDepth, humanizerEnabled } = chatRequestSchema.parse(
-      await request.json(),
-    );
-    const existingChat = await getChatById({ id });
-    const resolvedDepth =
-      researchDepth ?? existingChat?.researchDepth ?? "quick";
-    const { result, extractionModel, memoryEnabled, appliedSkill } = await streamCompanyChat({
-      chatId: id,
-      messages,
-      userId: session.user.id,
-      agentId,
-      researchDepth: resolvedDepth,
-      humanizerEnabled: humanizerEnabled ?? true,
-    });
+    const result = chatRequestSchema.safeParse(await request.json());
+    if (!result.success) {
+      return Response.json(
+        { error: "Invalid chat request." },
+        { status: 400 },
+      );
+    }
+    parsed = result.data;
+  } catch {
+    return Response.json({ error: "Invalid chat request." }, { status: 400 });
+  }
+
+  const { id, agentId, messages, researchDepth, humanizerEnabled } = parsed;
+  const existingChat = await getChatById({ id });
+  // Reject foreign chats before any model work; saveChat enforces this again
+  // on write, but only after a full streamed answer has been paid for.
+  if (existingChat && existingChat.userId !== session.user.id) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+  const resolvedDepth =
+    researchDepth ?? existingChat?.researchDepth ?? "quick";
+
+  try {
+    const { result, extractionModel, memoryEnabled, appliedSkill } =
+      await streamCompanyChat({
+        chatId: id,
+        messages,
+        userId: session.user.id,
+        agentId,
+        researchDepth: resolvedDepth,
+        humanizerEnabled: humanizerEnabled ?? true,
+      });
 
     return result.toUIMessageStreamResponse({
       originalMessages: messages,
@@ -78,9 +99,11 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to start the AI response.";
-    return Response.json({ error: message }, { status: 400 });
+    console.error("Failed to start chat stream", error);
+    return Response.json(
+      { error: "Unable to start the AI response." },
+      { status: 500 },
+    );
   }
 }
 

@@ -61,7 +61,8 @@ export function KnowledgeSourceCards({ output }: { output: unknown }) {
         return (
           <details
             key={result.chunkId || index}
-            className="group/kb rounded-md border border-border bg-muted/30 text-xs"
+            id={result.chunkId ? `cite-${result.chunkId}` : undefined}
+            className="group/kb scroll-mt-24 rounded-md border border-border bg-muted/30 text-xs transition-colors"
           >
             <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <BookOpenCheck

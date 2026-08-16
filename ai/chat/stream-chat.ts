@@ -12,6 +12,7 @@ import {
   wrapLanguageModel,
 } from "ai";
 
+import { shouldUseCompanyKnowledge } from "@/ai/chat/retrieval-gate";
 import { createMemoryMiddleware } from "@/ai/custom-middleware";
 import { companyAssistantSystemPrompt } from "@/ai/prompts/company-assistant";
 import {
@@ -108,9 +109,10 @@ async function knowledgePreflight(
       agentId,
       limit: 8,
       rerankModel,
+      persistTelemetry: false,
     });
     if (!matches.length) {
-      return "\n\nNOTEBOOK CHECK: The preflight search found no relevant approved company source. State that the answer was not found in approved company knowledge, and clearly separate any general guidance.";
+      return "\n\nNOTEBOOK CHECK: The preflight search found no relevant approved company source. If the question is about company matters, state that the answer was not found in approved company knowledge, and clearly separate any general guidance. If it is not a company question, answer normally without the company framing.";
     }
     const evidence = matches
       .map(
@@ -177,14 +179,28 @@ export async function streamCompanyChat(input: {
       ignoreIncompleteToolCalls: true,
     })
   ).filter((message) => message.content.length > 0);
-  const preflight = await knowledgePreflight(
-    messages,
-    input.userId,
-    input.chatId,
-    input.agentId,
-    agent.enabledTools,
-    researchSelection?.model ?? selected.model,
-  );
+  // Gate the notebook preflight: greetings and other clearly non-company
+  // turns skip retrieval entirely. Deep research is explicit intent, and the
+  // gate itself fails open (errors/timeouts run the preflight).
+  const gateModel = researchSelection?.model ?? selected.model;
+  const knowledgeAvailable =
+    isKnowledgeChatEnabled() && toolEnabled(agent.enabledTools, "knowledge");
+  const runPreflight =
+    knowledgeAvailable &&
+    userText !== "" &&
+    (isDeepMode ||
+      typeof gateModel === "string" ||
+      (await shouldUseCompanyKnowledge({ query: userText, model: gateModel })));
+  const preflight = runPreflight
+    ? await knowledgePreflight(
+        messages,
+        input.userId,
+        input.chatId,
+        input.agentId,
+        agent.enabledTools,
+        gateModel,
+      )
+    : "";
   const writerSelection = humanizerSelection ?? selected;
   const writerModel = writerSelection.model;
   const researchBaseModel = selected.model;
@@ -211,7 +227,9 @@ export async function streamCompanyChat(input: {
     webSearch: "webSearch" in tools,
   });
 
-  const system = `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText, isDeepMode)}\n\n${formatAgentSettingsForPrompt(agentSettings)}${turnSkill.skillPrompt ? `\n\n${turnSkill.skillPrompt}` : ""}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`;
+  const system = `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText, isDeepMode)}\n\n${formatAgentSettingsForPrompt(agentSettings, {
+    styleOverriddenBySkill: Boolean(turnSkill.appliedSkill),
+  })}${turnSkill.skillPrompt ? `\n\n${turnSkill.skillPrompt}` : ""}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`;
   const prepareStep = ({ stepNumber }: { stepNumber: number }) => {
     if (stepNumber === 0 && linkPlan.reader) {
       return {

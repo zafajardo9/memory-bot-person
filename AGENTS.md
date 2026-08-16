@@ -24,6 +24,8 @@ work progresses instead of improvising around it.
 | [`plans/framework-upgrade/PLAN.md`](plans/framework-upgrade/PLAN.md) | Planning | Framework, technology, and dependency upgrade. |
 | [`plans/sustainable-memory-context/PLAN.md`](plans/sustainable-memory-context/PLAN.md) | Planning | Sustainable memory, context, and knowledge implementation. |
 | [`plans/toolkit-expansion-user-memory/PLAN.md`](plans/toolkit-expansion-user-memory/PLAN.md) | Planning | Toolkit expansion and persistent user memory. |
+| [`plans/chat-ui-gold-standard/PLAN.md`](plans/chat-ui-gold-standard/PLAN.md) | Implemented | Chat experience upgrade: linked citation chips, message actions (regenerate, edit & resend), streaming polish, composer drafts/keyboard, chat API hardening. |
+| [`plans/skill-precedence-retrieval-gate/PLAN.md`](plans/skill-precedence-retrieval-gate/PLAN.md) | In Progress | Active skills override agent style for the turn; a fail-open classifier skips notebook preflight (and its telemetry) for non-knowledge turns. |
 
 When a new plan is created, add it to this table.
 

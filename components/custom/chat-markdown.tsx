@@ -1,17 +1,68 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import { memo, useMemo } from "react";
 import { Streamdown, type Components } from "streamdown";
 
 import { normalizeChatMarkdown } from "@/lib/ai/chat-markdown";
+import {
+  applyCitationMarkup,
+  citationAnchorId,
+  citationKeyFromHref,
+  type CitationRegistry,
+} from "@/lib/ai/citations";
 import { cn } from "@/lib/utils";
 
-import type { ComponentPropsWithoutRef, ElementType } from "react";
+import type { ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
 
 type MarkdownElementProps<T extends ElementType> =
   ComponentPropsWithoutRef<T> & {
     node?: unknown;
   };
+
+function CitationChip({
+  number,
+  chunkId,
+}: {
+  number: ReactNode;
+  chunkId?: string;
+}) {
+  const base =
+    "mx-0.5 inline-flex h-[17px] min-w-[17px] translate-y-[-0.35em] items-center justify-center rounded-full px-1 align-baseline text-[10px] font-semibold leading-none";
+
+  if (!chunkId) {
+    return (
+      <span
+        className={cn(base, "bg-muted text-muted-foreground/80")}
+        title="Company source citation"
+      >
+        {number}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        base,
+        "bg-primary/[0.12] text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
+      title="Show the cited source"
+      onClick={() => {
+        const target = document.getElementById(citationAnchorId(chunkId));
+        if (!target) return;
+        if (target instanceof HTMLDetailsElement) target.open = true;
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.classList.remove("citation-flash");
+        void target.offsetWidth; // restart the animation on repeated clicks
+        target.classList.add("citation-flash");
+      }}
+    >
+      {number}
+    </button>
+  );
+}
 
 const components = {
   a: ({
@@ -200,24 +251,50 @@ const components = {
   ),
 } satisfies Components;
 
-export function ChatMarkdown({
-  children,
-  streaming = false,
-}: {
+interface ChatMarkdownProps {
   children: string;
   streaming?: boolean;
-}) {
+  /** Citation anchors for this message's knowledge tool outputs, if any. */
+  citationRegistry?: CitationRegistry;
+}
+
+export const ChatMarkdown = memo(function ChatMarkdown({
+  children,
+  streaming = false,
+  citationRegistry,
+}: ChatMarkdownProps) {
+  const content = useMemo(() => {
+    const normalized = normalizeChatMarkdown(children);
+    return citationRegistry ? applyCitationMarkup(normalized) : normalized;
+  }, [children, citationRegistry]);
+
+  const citationComponents = useMemo<Components>(() => {
+    if (!citationRegistry) return components;
+    const baseAnchor = components.a;
+    return {
+      ...components,
+      a: (props: MarkdownElementProps<"a">) => {
+        const key = props.href ? citationKeyFromHref(props.href) : null;
+        const target = key !== null ? citationRegistry.get(key) : undefined;
+        if (key !== null) {
+          return <CitationChip number={props.children} chunkId={target?.chunkId} />;
+        }
+        return baseAnchor(props);
+      },
+    };
+  }, [citationRegistry]);
+
   return (
     <Streamdown
       className="min-w-0 break-words text-[15px]"
-      components={components}
+      components={citationComponents}
       controls={{ code: true, table: true }}
       lineNumbers={false}
       mode={streaming ? "streaming" : "static"}
       normalizeHtmlIndentation
       skipHtml
     >
-      {normalizeChatMarkdown(children)}
+      {content}
     </Streamdown>
   );
-}
+});

@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
+  isFileUIPart,
   isTextUIPart,
   type FileUIPart,
   type UIMessage,
@@ -13,6 +14,7 @@ import useSWR from "swr";
 
 import { Message as PreviewMessage } from "@/components/custom/message";
 import { useScrollToBottom } from "@/components/custom/use-scroll-to-bottom";
+import { useChatDraft } from "@/lib/ai/use-chat-draft";
 import { fetcher } from "@/lib/utils";
 
 import { useRegisterActiveAgent } from "./active-agent-context";
@@ -77,6 +79,7 @@ export function Chat({
   const {
     messages,
     sendMessage,
+    setMessages,
     status,
     stop,
     error,
@@ -105,7 +108,11 @@ export function Chat({
   useEffect(() => {
     sendMessageRef.current = sendMessage;
   }, [sendMessage]);
-  const [input, setInput] = useState("");
+  // The new-chat screen regenerates its chat id on every load, so drafts are
+  // scoped by agent there; existing chats keep their stable URL id.
+  const [input, setInput] = useChatDraft(
+    initialMessages.length > 0 ? id : `new:${agentId}`,
+  );
   const { data: runtimeStatus } = useSWR<WorkspaceAIRuntimeStatus>(
     `/api/ai/runtime?agentId=${encodeURIComponent(agentId)}`,
     fetcher,
@@ -146,7 +153,7 @@ export function Chat({
     return messages.filter((m) => {
       if (seen.has(m.id)) return false;
       seen.add(m.id);
-      return true;
+      return m;
     });
   }, [messages]);
   const latestUserMessage =
@@ -157,6 +164,24 @@ export function Chat({
       .map((part) => part.text)
       .join("")
       .trim() ?? "";
+
+  const handleFollowUpSelect = useCallback(
+    (question: string) => sendMessage({ text: question }),
+    [sendMessage],
+  );
+  const handleRegenerate = useCallback(
+    () => regenerate(),
+    [regenerate],
+  );
+  const handleEditMessage = useCallback(
+    (edited: UIMessage, text: string) => {
+      const index = messages.findIndex((message) => message.id === edited.id);
+      if (index === -1) return;
+      setMessages(messages.slice(0, index));
+      void sendMessage({ text, files: edited.parts.filter(isFileUIPart) });
+    },
+    [messages, sendMessage, setMessages],
+  );
 
   return (
     <main className="flex h-dvh flex-row justify-center bg-transparent pb-[max(1rem,env(safe-area-inset-bottom))] pt-16 md:pb-6">
@@ -175,7 +200,16 @@ export function Chat({
                 message={message}
                 agentName={agentName}
                 userMessage={latestUserMessage}
-                onSelectFollowUp={(question) => sendMessage({ text: question })}
+                onSelectFollowUp={handleFollowUpSelect}
+                onRegenerate={
+                  !isLoading &&
+                  !error &&
+                  message.role === "assistant" &&
+                  index === dedupedMessages.length - 1
+                    ? handleRegenerate
+                    : undefined
+                }
+                onEditMessage={!isLoading && !error ? handleEditMessage : undefined}
                 showFollowUps={
                   !isLoading &&
                   !error &&

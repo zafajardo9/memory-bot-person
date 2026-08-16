@@ -205,20 +205,7 @@ export const SkillPicker = forwardRef<
               style={position}
               className="glass fixed z-[100] flex flex-col overflow-hidden rounded-2xl shadow-[0_16px_44px_hsl(var(--foreground)/0.12)]"
             >
-              <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2.5">
-                <Search
-                  size={13}
-                  className="text-muted-foreground"
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                  {query ? `Skills matching “${query}”` : "Choose a skill"}
-                </span>
-                <kbd className="font-mono text-[10px] text-muted-foreground/70">
-                  ↑↓ · Enter
-                </kbd>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
                 {skills.length ? (
                   skills.map((skill, index) => (
                     <button
@@ -228,48 +215,52 @@ export const SkillPicker = forwardRef<
                       aria-selected={index === activeIndex}
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => selectSkill(skill)}
-                      className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
                         index === activeIndex
                           ? "bg-primary/[0.09] text-foreground"
                           : "hover:bg-foreground/[0.04]"
                       }`}
                     >
-                      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] text-primary">
-                        <Command size={14} aria-hidden />
+                      <span className="min-w-0 truncate text-sm font-semibold">
+                        {skill.name}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-baseline gap-2">
-                          <span className="truncate text-sm font-medium">
-                            {skill.name}
-                          </span>
-                          <span className="shrink-0 font-mono text-[11px] text-primary/80">
-                            /{skill.slug}
-                          </span>
-                        </span>
-                        {skill.description ? (
-                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                            {skill.description}
-                          </span>
-                        ) : null}
+                      <span className="shrink-0 font-mono text-[11px] text-primary/75">
+                        /{skill.slug}
                       </span>
                     </button>
                   ))
                 ) : (
                   <div className="px-4 py-6 text-center">
-                    <p className="text-sm font-medium">No matching skills</p>
+                    <p className="text-sm font-semibold">No matching skills</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Create a reusable instruction, then call it with /command.
                     </p>
                   </div>
                 )}
               </div>
-              <Link
-                href={`/agents/${agentId}/settings?tab=skills`}
-                className="flex items-center gap-2 border-t border-border/60 px-4 py-3 text-xs font-medium text-primary transition-colors hover:bg-primary/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              >
-                <Plus size={13} aria-hidden />
-                Create or manage skills
-              </Link>
+              <div className="flex items-center gap-2 border-t border-border/60 px-3 py-2">
+                <Search
+                  size={12}
+                  className="shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                  {query ? `Skills matching “${query}”` : "Choose a skill"}
+                </span>
+                <kbd className="shrink-0 font-mono text-[10px] text-muted-foreground/70">
+                  ↑↓ · ↵
+                </kbd>
+                <span aria-hidden className="shrink-0 text-border">
+                  ·
+                </span>
+                <Link
+                  href={`/agents/${agentId}/settings?tab=skills`}
+                  className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring rounded-sm"
+                >
+                  <Plus size={12} aria-hidden />
+                  Create or manage skills
+                </Link>
+              </div>
             </div>,
             document.body,
           )

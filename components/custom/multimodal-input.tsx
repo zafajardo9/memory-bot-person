@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
   WandSparkles,
   X,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import React, {
@@ -265,7 +266,7 @@ export function MultimodalInput({
 
         {queuedMessage ? (
           <div
-            className="mx-3 mt-3 flex items-center gap-2 rounded-2xl bg-primary/[0.055] px-3 py-2 text-xs text-muted-foreground"
+            className="mx-3 mt-3 flex animate-in items-center gap-2 fade-in slide-in-from-bottom-1 rounded-2xl bg-primary/[0.055] px-3 py-2 text-xs text-muted-foreground duration-200"
             role="status"
             aria-label="Message queued to send next"
           >
@@ -341,7 +342,16 @@ export function MultimodalInput({
           rows={2}
           onKeyDown={(event) => {
             if (skillPickerRef.current?.handleKeyDown(event)) return;
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Escape" && isLoading) {
+              event.preventDefault();
+              stop();
+              return;
+            }
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.altKey
+            ) {
               event.preventDefault();
 
               submitForm();
@@ -384,30 +394,49 @@ export function MultimodalInput({
             <WandSparkles size={13} />
             Humanizer
           </button>
-          <button
-            type="button"
-            onClick={() =>
-              onResearchDepthChange(researchDepth === "deep" ? "quick" : "deep")
-            }
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-              researchDepth === "deep"
-                ? "border-primary/25 bg-primary/10 text-primary"
-                : "border-transparent text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
-            }`}
+          <div
+            role="group"
+            aria-label="Research depth"
             title={
               researchDepth === "deep"
                 ? "Deep: Notebook + web corroboration"
                 : "Quick: Notebook only"
             }
-            aria-label={
-              researchDepth === "deep"
-                ? "Switch to Quick research"
-                : "Switch to Deep research"
-            }
+            className="flex shrink-0 items-center rounded-full border border-border/70 bg-foreground/[0.03] p-0.5 dark:border-border"
           >
-            <Compass size={13} />
-            {researchDepth === "deep" ? "Deep" : "Quick"}
-          </button>
+            {(
+              [
+                {
+                  value: "quick" as const,
+                  label: "Quick",
+                  icon: Zap,
+                  hint: "Switch to Quick research",
+                },
+                {
+                  value: "deep" as const,
+                  label: "Deep",
+                  icon: Compass,
+                  hint: "Switch to Deep research",
+                },
+              ] as const
+            ).map(({ value, label, icon: Icon, hint }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onResearchDepthChange(value)}
+                className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  researchDepth === value
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground"
+                }`}
+                aria-pressed={researchDepth === value}
+                aria-label={hint}
+              >
+                <Icon size={13} aria-hidden />
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="min-w-0 flex-1" />
 
           <div className="flex shrink-0 items-center gap-1">
@@ -481,9 +510,16 @@ export function MultimodalInput({
 
       <div className="flex items-center justify-center gap-3 px-10 text-center text-[10px] text-muted-foreground sm:justify-between sm:px-2 sm:text-left">
         <span>Kairo can make mistakes. Verify important information.</span>
-        <span className="hidden shrink-0 sm:inline">
-          <kbd className="font-mono">Shift ↵</kbd>{" "}
-          for a new line
+        <span className="hidden shrink-0 items-center gap-2.5 sm:inline-flex">
+          <kbd className="font-mono">Shift ↵</kbd>
+          new line
+          {isLoading ? (
+            <>
+              <span aria-hidden>·</span>
+              <kbd className="font-mono">Esc</kbd>
+              stop
+            </>
+          ) : null}
         </span>
       </div>
     </div>
