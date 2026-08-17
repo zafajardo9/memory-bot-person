@@ -82,16 +82,9 @@ describe("workspace research model settings", () => {
     expect(settings.providers[0].models).toEqual([toolModel]);
   });
 
-  it("uses Google as the default Thinking provider before an admin saves roles", async () => {
-    await expect(resolveWorkspaceResearchModel()).resolves.toMatchObject({
-      providerId: "google",
-      modelId: toolModel.id,
-    });
-    expect(mocks.getProviderStatus).toHaveBeenCalledWith("google");
-    expect(mocks.resolveProviderLanguageModel).toHaveBeenCalledWith(
-      "google",
-      toolModel.id,
-    );
+  it("returns null for the research role until an admin saves one", async () => {
+    await expect(resolveWorkspaceResearchModel()).resolves.toBeNull();
+    expect(mocks.getProviderStatus).not.toHaveBeenCalledWith("google");
   });
 
   it("keeps chat-only models available for the Humanizer role", async () => {

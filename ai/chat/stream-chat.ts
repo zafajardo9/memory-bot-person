@@ -259,7 +259,11 @@ export async function streamCompanyChat(input: {
     },
   });
 
-  const splitFlow = Boolean(researchSelection || humanizerRequested);
+  // Only split into research + answer phases when there is an actual second
+  // model to do the work. When the Humanizer is toggled on but no Humanizer
+  // model is configured (and no research role is set), splitting would run the
+  // same model through two full passes for zero benefit.
+  const splitFlow = Boolean(researchSelection || humanizerSelection);
   const result = splitFlow
     ? {
         toUIMessageStreamResponse(options: ChatStreamResponseOptions = {}) {

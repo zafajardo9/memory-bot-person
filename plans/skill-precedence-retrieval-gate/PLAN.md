@@ -1,17 +1,33 @@
 # Skill Style Precedence and Retrieval Gating
 
-> **Status**: [x] Planning | [ ] In Progress | [ ] Implemented | [ ] Archived
+> **Status**: [x] Planning | [ ] In Progress | [x] Implemented | [ ] Archived
 >
 > **Created**: 2026-08-16
+>
+> **Implemented**: 2026-08-17
 >
 > **Quick Checklist**:
 > - [x] Requirements gathered
 > - [x] Codebase analyzed
-> - [ ] Phase 1: Skills override agent style for the turn
-> - [ ] Phase 2: Knowledge-need classifier gates the preflight
-> - [ ] Phase 3: Preflight telemetry hygiene + calibrated miss framing
-> - [ ] Tests passing
+> - [x] Phase 1: Skills override agent style for the turn
+> - [x] Phase 2: Knowledge-need classifier gates the preflight
+> - [x] Phase 3: Preflight telemetry hygiene + calibrated miss framing
+> - [x] Tests passing (194/194, gate fail-open + precedence formatting; lint and typecheck clean)
 > - [ ] Deployed
+
+### Implementation notes (2026-08-17)
+
+- The gate is one structured call (`useKnowledge: boolean`) on the already
+  resolved research model, 5s timeout, one retry; every failure path returns
+  `true` so grounding-first behavior is never lost. String model
+  specifications and Deep research mode bypass the gate.
+- Verified against live data: a greeting turn produced a natural answer with
+  zero `KnowledgeQueryLog` rows, while real company questions (in active use)
+  continue to log deliberate `searchCompanyKnowledge` tool calls with hits
+  and grounded, cited answers.
+- `KnowledgeSearchOutcome.queryLogId` is now `string | null` (null only for
+  telemetry-skipped preflight calls); the feedback route and message UI
+  already treat it as optional.
 
 ## 1. Goal
 

@@ -264,6 +264,33 @@ describe("provider-role chat orchestration", () => {
     expect(body).toContain("FALLBACK_ANSWER");
   });
 
+  it("keeps the single-model stream when Humanizer is on but no research or end model exists", async () => {
+    const writerModel = streamingModel("writer-provider", "writer", "SINGLE_ANSWER");
+    mocks.resolveUserLanguageModel.mockResolvedValue({
+      providerId: "writer-provider",
+      modelId: "writer",
+      model: writerModel,
+    });
+    mocks.resolveWorkspaceResearchModel.mockResolvedValue(null);
+    mocks.resolveWorkspaceHumanizerModel.mockResolvedValue(null);
+
+    const { result } = await streamCompanyChat({
+      chatId: "chat-id",
+      userId: "user-id",
+      agentId: "agent-id",
+      messages,
+      humanizerEnabled: true,
+    });
+    const body = await result.toUIMessageStreamResponse({
+      originalMessages: messages,
+    }).text();
+
+    // No second model exists to do research or rewriting, so the turn must not
+    // pay for a second full pass with the same model.
+    expect(writerModel.doStreamCalls).toHaveLength(1);
+    expect(body).toContain("SINGLE_ANSWER");
+  });
+
   it("uses the Thinking model as the Humanizer fallback when no end model is configured", async () => {
     const thinkingModel = streamingModel("google", "gemini", "GOOGLE_HUMANIZED");
     mocks.resolveWorkspaceResearchModel.mockResolvedValue({

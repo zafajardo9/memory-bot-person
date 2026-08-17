@@ -225,23 +225,11 @@ export async function getWorkspaceAIRuntimeStatus(
 export async function resolveWorkspaceResearchModel() {
   const config = await storedConfig();
   if (process.env.AI_RESEARCH_MODEL_ENABLED === "false") return null;
-
-  if (!config) {
-    try {
-      const status = await getProviderStatus("google");
-      if (!status.configured || !status.enabled) return null;
-      const models = await getProviderModels("google", { requireEnabled: true });
-      const model =
-        models.find(
-          (candidate) =>
-            candidate.id === status.defaultModelId && candidate.toolCallingCapable,
-        ) ?? models.find((candidate) => candidate.toolCallingCapable);
-      if (!model) return null;
-      return await resolveProviderLanguageModel("google", model.id);
-    } catch {
-      return null;
-    }
-  }
+  // The research role is explicit: without a saved workspace selection there
+  // is no dedicated research model, and chat falls back to the user's model
+  // (single-pass flow). A silent default here would force every chat turn
+  // through the two-phase research pipeline even when nothing was configured.
+  if (!config) return null;
 
   try {
     const status = await getProviderStatus(config.researchProviderId);
