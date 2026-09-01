@@ -36,6 +36,8 @@ export const deepseekProviderAdapter: AIProviderAdapter = {
   description: "DeepSeek V4 chat models — strong performance at lower cost.",
   environmentKey: "DEEPSEEK_API_KEY",
   defaultModelId: "deepseek-v4-flash",
+  // V4 models run in thinking mode, which rejects a forced tool_choice.
+  supportsForcedToolChoice: false,
   createLanguageModel(apiKey, modelId) {
     return createDeepSeek({ apiKey })(modelId);
   },

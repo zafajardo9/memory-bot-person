@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createTavilyProvider } from "@/lib/web/tavily";
+import { createTinyFishProvider } from "@/lib/web/tinyfish";
 
 interface IntegrationDefinition {
   id: string;
@@ -28,6 +29,17 @@ const integrations = {
     normalizeSecret: normalizeApiKey,
     testConnection: async (apiKey: string) => {
       await createTavilyProvider(apiKey).search("Tavily connection test", 1);
+    },
+  },
+  tinyfish: {
+    id: "tinyfish",
+    label: "TinyFish",
+    description:
+      "Free live web search as a second provider layer; results are merged with other configured providers.",
+    environmentKey: "TINYFISH_API_KEY",
+    normalizeSecret: normalizeApiKey,
+    testConnection: async (apiKey: string) => {
+      await createTinyFishProvider(apiKey).search("TinyFish connection test", 1);
     },
   },
 } satisfies Record<string, IntegrationDefinition>;

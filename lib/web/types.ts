@@ -4,6 +4,8 @@ export interface WebSearchResult {
   content: string;
   score: number;
   publishedDate?: string;
+  /** Label of the provider that returned this result (e.g. "Tavily"). */
+  source?: string;
 }
 
 export interface WebSearchOptions {

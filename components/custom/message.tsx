@@ -58,6 +58,9 @@ export const Message = memo(function Message({
     .join("");
   const reasoning = message.parts.filter(isReasoningUIPart);
   const toolInvocations = message.parts.filter(isToolUIPart);
+  const activity = message.parts.filter(
+    (part) => isReasoningUIPart(part) || isToolUIPart(part),
+  );
   const attachments = message.parts.filter(isFileUIPart);
   const sources = message.parts.filter((part) => part.type === "source-url");
   const isAssistant = role === "assistant";
@@ -257,8 +260,7 @@ export const Message = memo(function Message({
         {isAssistant ? (
           <AssistantActivity
             chatId={chatId}
-            reasoning={reasoning}
-            tools={toolInvocations}
+            activity={activity}
             sources={sources}
             isActive={isActive}
           />

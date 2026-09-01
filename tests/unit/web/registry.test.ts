@@ -6,12 +6,17 @@ import {
 } from "../../../lib/web/registry";
 
 describe("web search provider registry", () => {
-  it("registers Tavily behind the common provider contract", () => {
-    expect(listWebSearchProviderIds()).toEqual(["tavily"]);
+  it("registers Tavily and TinyFish behind the common provider contract", () => {
+    expect(listWebSearchProviderIds()).toEqual(["tavily", "tinyfish"]);
     expect(createWebSearchProvider("tavily", "test-key")).toMatchObject({
       id: "tavily",
       label: "Tavily",
       environmentKey: "TAVILY_API_KEY",
+    });
+    expect(createWebSearchProvider("tinyfish", "test-key")).toMatchObject({
+      id: "tinyfish",
+      label: "TinyFish",
+      environmentKey: "TINYFISH_API_KEY",
     });
   });
 

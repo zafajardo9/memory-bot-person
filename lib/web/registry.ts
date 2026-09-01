@@ -1,11 +1,15 @@
 import { createTavilyProvider } from "./tavily";
+import { createTinyFishProvider } from "./tinyfish";
 
 import type { WebSearchProvider } from "./types";
 
 const providerFactories = new Map<
   string,
   (apiKey: string) => WebSearchProvider
->([["tavily", createTavilyProvider]]);
+>([
+  ["tavily", createTavilyProvider],
+  ["tinyfish", createTinyFishProvider],
+]);
 
 export function listWebSearchProviderIds() {
   return [...providerFactories.keys()];

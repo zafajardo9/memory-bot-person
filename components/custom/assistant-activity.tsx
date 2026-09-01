@@ -1,19 +1,9 @@
 "use client";
 
 import {
-  AlertCircle,
-  BookOpenCheck,
-  BrainCircuit,
   Check,
   ChevronDown,
-  Database,
   ExternalLink,
-  FileSearch,
-  Globe2,
-  Save,
-  Search,
-  Trash2,
-  Wrench,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -25,81 +15,83 @@ import { FlightStatus } from "@/components/flights/flight-status";
 import { ListFlights } from "@/components/flights/list-flights";
 import { SelectSeats } from "@/components/flights/select-seats";
 import { VerifyPayment } from "@/components/flights/verify-payment";
+import ToolChips from "@/components/primitives/ToolChips";
 
 import { KnowledgeSourceCards } from "./knowledge-source-cards";
 import { Weather } from "./weather";
 
+import type { ToolStep } from "@/components/primitives/ToolChips";
 import type {
   DynamicToolUIPart,
   ReasoningUIPart,
   SourceUrlUIPart,
   ToolUIPart,
 } from "ai";
-import type { LucideIcon } from "lucide-react";
 
 type ActivityToolPart = ToolUIPart | DynamicToolUIPart;
+type ActivityPart = ReasoningUIPart | ActivityToolPart;
 
 interface ToolPresentation {
   activeLabel: string;
   completeLabel: string;
-  icon: LucideIcon;
+  icon: string;
 }
 
 const toolPresentations: Record<string, ToolPresentation> = {
   webSearch: {
     activeLabel: "Searching the web",
     completeLabel: "Searched the web",
-    icon: Globe2,
+    icon: "run",
   },
   readWebPage: {
     activeLabel: "Reading a web page",
     completeLabel: "Read a web page",
-    icon: Search,
+    icon: "read",
   },
   browseWebPage: {
     activeLabel: "Rendering a web page",
     completeLabel: "Rendered a web page",
-    icon: Globe2,
+    icon: "run",
   },
   searchCompanyKnowledge: {
     activeLabel: "Searching company knowledge",
     completeLabel: "Searched company knowledge",
-    icon: Database,
+    icon: "read",
   },
   readCompanyKnowledge: {
     activeLabel: "Reading company sources",
     completeLabel: "Read company sources",
-    icon: BookOpenCheck,
+    icon: "read",
   },
   listCompanyKnowledgeSources: {
     activeLabel: "Checking available sources",
     completeLabel: "Checked available sources",
-    icon: BookOpenCheck,
+    icon: "read",
   },
   searchPersonalFiles: {
     activeLabel: "Searching your files",
     completeLabel: "Searched your files",
-    icon: FileSearch,
+    icon: "read",
   },
   readFile: {
     activeLabel: "Reading a file",
     completeLabel: "Read a file",
-    icon: FileSearch,
+    icon: "read",
   },
   listUserMemory: {
     activeLabel: "Checking saved context",
     completeLabel: "Checked saved context",
-    icon: Database,
+    icon: "read",
   },
   saveUserMemory: {
     activeLabel: "Remembering for later",
     completeLabel: "Saved to memory",
-    icon: Save,
+    icon: "write",
   },
   deleteUserMemory: {
     activeLabel: "Removing outdated context",
     completeLabel: "Removed from memory",
-    icon: Trash2,
+    icon: "write",
   },
 };
 
@@ -113,7 +105,7 @@ export function getToolPresentation(toolName: string): ToolPresentation {
   return {
     activeLabel: `Using ${readableName}`,
     completeLabel: `Used ${readableName}`,
-    icon: Wrench,
+    icon: "run",
   };
 }
 
@@ -152,7 +144,7 @@ export function describeToolInput(toolName: string, input: unknown) {
   return "";
 }
 
-function toolState(part: ActivityToolPart) {
+export function getToolActivityState(part: ActivityToolPart) {
   switch (part.state) {
     case "input-streaming":
       return { label: "Preparing", tone: "active" as const };
@@ -171,6 +163,46 @@ function toolState(part: ActivityToolPart) {
     case "output-available":
       return { label: "Done", tone: "done" as const };
   }
+}
+
+export function toolPartToStep(part: ActivityToolPart): ToolStep {
+  const toolName =
+    part.type === "dynamic-tool" ? part.toolName : part.type.slice(5);
+  const presentation = getToolPresentation(toolName);
+  const state = getToolActivityState(part);
+  const isComplete = part.state === "output-available";
+  const inputDescription = describeToolInput(toolName, part.input);
+
+  return {
+    id: part.toolCallId,
+    icon: presentation.icon,
+    label: isComplete
+      ? presentation.completeLabel
+      : presentation.activeLabel,
+    chip: inputDescription || state.label,
+    mono:
+      toolName === "readFile" ||
+      toolName === "readWebPage" ||
+      toolName === "browseWebPage",
+    status: state.tone,
+    detail: [{ text: `Status: ${state.label}` }],
+  };
+}
+
+export function reasoningPartToStep(
+  part: ReasoningUIPart,
+  index: number,
+): ToolStep {
+  const isStreaming = part.state === "streaming";
+  const preview = part.text.trim().split(/\n+/)[0]?.slice(0, 120);
+
+  return {
+    id: `reasoning-${index}`,
+    icon: "think",
+    label: isStreaming ? "Thinking" : "Thought through the request",
+    chip: preview || (isStreaming ? "Working through the request…" : "Complete"),
+    status: isStreaming ? "active" : "done",
+  };
 }
 
 function WebSearchOutput({ output }: { output: unknown }) {
@@ -387,35 +419,7 @@ export function ProcessingCircles({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function ReasoningActivity({ part }: { part: ReasoningUIPart }) {
-  const isStreaming = part.state === "streaming";
-
-  return (
-    <div className="relative pb-3 pl-7 last:pb-0">
-      <span className="absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full bg-primary/[0.055] text-primary/70">
-        <BrainCircuit size={11} />
-      </span>
-      <details className="group/reasoning" open={isStreaming || undefined}>
-        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <span>{isStreaming ? "Thinking" : "Thought through the request"}</span>
-          {isStreaming ? (
-            <ProcessingCircles compact />
-          ) : (
-            <ChevronDown
-              size={12}
-              className="text-muted-foreground transition-transform group-open/reasoning:rotate-180"
-            />
-          )}
-        </summary>
-        <div className="mt-1.5 pl-0.5 text-[13px] leading-6 text-muted-foreground/75">
-          <Streamdown>{part.text}</Streamdown>
-        </div>
-      </details>
-    </div>
-  );
-}
-
-function ToolActivity({
+function ToolStepDetail({
   chatId,
   part,
 }: {
@@ -424,11 +428,6 @@ function ToolActivity({
 }) {
   const toolName =
     part.type === "dynamic-tool" ? part.toolName : part.type.slice(5);
-  const presentation = getToolPresentation(toolName);
-  const state = toolState(part);
-  const Icon = presentation.icon;
-  const isComplete = part.state === "output-available";
-  const inputDescription = describeToolInput(toolName, part.input);
   const errorText =
     part.state === "output-error"
       ? part.errorText
@@ -437,59 +436,11 @@ function ToolActivity({
         : "";
 
   return (
-    <div className="relative pb-3 pl-7 last:pb-0">
-      <span
-        className={`absolute left-0 top-0.5 flex size-5 items-center justify-center rounded-full ${
-          state.tone === "error"
-            ? "bg-destructive/[0.07] text-destructive/80"
-            : state.tone === "done"
-              ? "bg-primary/[0.07] text-primary/75"
-              : "bg-primary/[0.055] text-primary/70"
-        }`}
-      >
-        {state.tone === "error" ? (
-          <AlertCircle size={11} />
-        ) : state.tone === "done" ? (
-          <Check size={11} />
-        ) : (
-          <Icon size={11} />
-        )}
-      </span>
-
-      <div>
-        <div className="flex min-h-5 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="text-sm font-medium">
-            {isComplete
-              ? presentation.completeLabel
-              : presentation.activeLabel}
-          </span>
-          <span
-            className={`inline-flex items-center gap-1 text-[11px] font-medium ${
-              state.tone === "error"
-                ? "text-destructive"
-                : state.tone === "done"
-                  ? "text-muted-foreground/70"
-                  : state.tone === "waiting"
-                    ? "text-amber-700 dark:text-amber-300"
-                    : "text-primary/75"
-            }`}
-          >
-            {state.tone === "active" ? (
-              <ProcessingCircles compact />
-            ) : null}
-            {state.label}
-          </span>
-        </div>
-        {inputDescription ? (
-          <p className="mt-0.5 break-words text-xs leading-5 text-muted-foreground">
-            {inputDescription}
-          </p>
-        ) : null}
-        {errorText ? (
-          <p className="mt-1 text-xs leading-5 text-destructive">{errorText}</p>
-        ) : null}
-        <ToolOutput chatId={chatId} part={part} toolName={toolName} />
-      </div>
+    <div className="min-w-0 pb-1 pr-1">
+      {errorText ? (
+        <p className="whitespace-normal text-xs leading-5 text-red">{errorText}</p>
+      ) : null}
+      <ToolOutput chatId={chatId} part={part} toolName={toolName} />
     </div>
   );
 }
@@ -561,6 +512,42 @@ function researchSummary(tools: ActivityToolPart[]) {
   return { notebookSources, webSources, researchingNow };
 }
 
+export function getActivityHeader({
+  isActive,
+  researchingNow,
+  totalSources,
+  toolCount,
+  reasoningCount,
+}: {
+  isActive: boolean;
+  researchingNow: boolean;
+  totalSources: number;
+  toolCount: number;
+  reasoningCount: number;
+}) {
+  const sourcePhrase =
+    totalSources === 0
+      ? ""
+      : ` · ${totalSources} source${totalSources === 1 ? "" : "s"}`;
+
+  if (isActive) {
+    return researchingNow
+      ? `Researching${sourcePhrase}…`
+      : "Composing your answer…";
+  }
+
+  const parts = [
+    toolCount > 0
+      ? `${toolCount} tool call${toolCount === 1 ? "" : "s"}`
+      : null,
+    reasoningCount > 0
+      ? `${reasoningCount} thinking step${reasoningCount === 1 ? "" : "s"}`
+      : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? `${parts.join(", ")}${sourcePhrase}` : `Researched${sourcePhrase}`;
+}
+
 function ElapsedSeconds() {
   const [elapsed, setElapsed] = useState(0);
 
@@ -585,64 +572,73 @@ function ElapsedSeconds() {
 
 export function AssistantActivity({
   chatId,
-  reasoning,
-  tools,
+  activity,
   sources,
   isActive,
 }: {
   chatId: string;
-  reasoning: ReasoningUIPart[];
-  tools: ActivityToolPart[];
+  activity: ActivityPart[];
   sources: SourceUrlUIPart[];
   isActive: boolean;
 }) {
-  const hasActivity =
-    reasoning.length > 0 || tools.length > 0 || sources.length > 0;
+  const tools = activity.filter(
+    (part): part is ActivityToolPart => part.type !== "reasoning",
+  );
+  const reasoningCount = activity.length - tools.length;
+  const hasActivity = activity.length > 0 || sources.length > 0;
 
   if (!hasActivity && !isActive) return null;
 
   const { notebookSources, webSources, researchingNow } =
     researchSummary(tools);
   const totalSources = notebookSources + webSources;
-  const sourcePhrase =
-    totalSources === 0
-      ? ""
-      : ` · ${totalSources} source${totalSources === 1 ? "" : "s"}`;
-  const headerLabel = isActive
-    ? researchingNow
-      ? `Researching${sourcePhrase}…`
-      : "Composing your answer…"
-    : `Researched${sourcePhrase}`;
+  const headerLabel = getActivityHeader({
+    isActive,
+    researchingNow,
+    totalSources,
+    toolCount: tools.length,
+    reasoningCount,
+  });
+  const steps = activity.map((part, index): ToolStep => {
+    if (part.type === "reasoning") {
+      const step = reasoningPartToStep(part, index);
+      return {
+        ...step,
+        detail: undefined,
+        detailContent: part.text ? (
+          <div className="whitespace-normal text-[12px] leading-5 text-ink-2">
+            <Streamdown>{part.text}</Streamdown>
+          </div>
+        ) : undefined,
+      };
+    }
+
+    return {
+      ...toolPartToStep(part),
+      detailContent: <ToolStepDetail chatId={chatId} part={part} />,
+    };
+  });
 
   return (
     <section aria-label="Assistant work trace" className="text-sm">
-      <details className="group/work" open={isActive || undefined}>
-        <summary className="flex w-fit cursor-pointer list-none items-center gap-2 py-0.5 text-xs font-medium text-muted-foreground/75 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          {isActive ? (
-            <ProcessingCircles />
-          ) : (
-            <Check size={13} className="text-primary/70" />
-          )}
-          <span>{headerLabel}</span>
-          {isActive ? <ElapsedSeconds /> : null}
-          <ChevronDown
-            size={12}
-            className="transition-transform group-open/work:rotate-180"
-          />
-        </summary>
-
-        {hasActivity ? (
-          <div className="mt-3 pl-0.5 opacity-90">
-            {reasoning.map((part, index) => (
-              <ReasoningActivity key={`reasoning-${index}`} part={part} />
-            ))}
-            {tools.map((part) => (
-              <ToolActivity key={part.toolCallId} chatId={chatId} part={part} />
-            ))}
-            <SourcesActivity sources={sources} />
-          </div>
-        ) : null}
-      </details>
+      <ToolChips
+        steps={steps}
+        diffs={[]}
+        labels={{ header: headerLabel, more: "" }}
+        progressive={false}
+        animateRows={false}
+        defaultOpen={isActive}
+        headerAccessory={
+          isActive ? (
+            <>
+              <ProcessingCircles compact />
+              <ElapsedSeconds />
+            </>
+          ) : null
+        }
+        className="max-w-xl"
+      />
+      <SourcesActivity sources={sources} />
     </section>
   );
 }

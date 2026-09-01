@@ -1,6 +1,7 @@
 import { createKnowledgeTools } from "@/ai/knowledge-tools";
 import { toolEnabled } from "@/lib/agents";
 import { isKnowledgeChatEnabled } from "@/lib/knowledge/config";
+import { agentHasApprovedKnowledge } from "@/lib/knowledge/retrieval";
 import { isUserMemoryEnabled } from "@/lib/memory/config";
 import { isAgentBrowserInstalled } from "@/lib/web/agent-browser";
 import {
@@ -31,15 +32,19 @@ export async function createChatTools(input: {
   const webSearchConfigured =
     publicWebEnabled &&
     (await isWebSearchConfigured());
+  const knowledgeEnabled =
+    isKnowledgeChatEnabled() && toolEnabled(input.enabledTools, "knowledge");
+  const knowledgeRetrievalAvailable =
+    knowledgeEnabled && (await agentHasApprovedKnowledge(input.agentId));
 
   return {
-    ...(isKnowledgeChatEnabled() &&
-    toolEnabled(input.enabledTools, "knowledge")
+    ...(knowledgeEnabled
       ? createKnowledgeTools({
           userId: input.userId,
           chatId: input.chatId,
           agentId: input.agentId,
           model: input.model,
+          retrievalAvailable: knowledgeRetrievalAvailable,
         })
       : {}),
     ...(publicWebEnabled && toolEnabled(input.enabledTools, "web")

@@ -15,6 +15,7 @@ import {
 import { shouldUseCompanyKnowledge } from "@/ai/chat/retrieval-gate";
 import { createMemoryMiddleware } from "@/ai/custom-middleware";
 import { companyAssistantSystemPrompt } from "@/ai/prompts/company-assistant";
+import { getAIProviderAdapter, isAIProviderId } from "@/ai/providers/registry";
 import {
   resolveWorkspaceHumanizerModel,
   resolveWorkspaceResearchModel,
@@ -29,7 +30,10 @@ import {
 import { formatAgentSettingsForPrompt } from "@/lib/agent-settings";
 import { agentSettingsFromProfile, toolEnabled } from "@/lib/agents";
 import { isKnowledgeChatEnabled } from "@/lib/knowledge/config";
-import { searchCompanyKnowledge } from "@/lib/knowledge/retrieval";
+import {
+  agentHasApprovedKnowledge,
+  searchCompanyKnowledge,
+} from "@/lib/knowledge/retrieval";
 import {
   formatSkillInstructionsForPrompt,
   isChatSkillsEnabled,
@@ -180,11 +184,15 @@ export async function streamCompanyChat(input: {
     })
   ).filter((message) => message.content.length > 0);
   // Gate the notebook preflight: greetings and other clearly non-company
-  // turns skip retrieval entirely. Deep research is explicit intent, and the
-  // gate itself fails open (errors/timeouts run the preflight).
+  // turns skip retrieval entirely, and an agent with no approved knowledge
+  // sources skips it too (no embeddings, no failed provider warnings). Deep
+  // research is explicit intent, and the gate itself fails open (errors/timeouts
+  // run the preflight).
   const gateModel = researchSelection?.model ?? selected.model;
   const knowledgeAvailable =
-    isKnowledgeChatEnabled() && toolEnabled(agent.enabledTools, "knowledge");
+    isKnowledgeChatEnabled() &&
+    toolEnabled(agent.enabledTools, "knowledge") &&
+    (await agentHasApprovedKnowledge(input.agentId));
   const runPreflight =
     knowledgeAvailable &&
     userText !== "" &&
@@ -230,17 +238,37 @@ export async function streamCompanyChat(input: {
   const system = `${companyAssistantSystemPrompt}\n\n${webResearchInstruction(webAccessApproved, userText, isDeepMode)}\n\n${formatAgentSettingsForPrompt(agentSettings, {
     styleOverriddenBySkill: Boolean(turnSkill.appliedSkill),
   })}${turnSkill.skillPrompt ? `\n\n${turnSkill.skillPrompt}` : ""}\n\nToday's date is ${new Date().toLocaleDateString()}.${preflight}`;
+  // Some providers (e.g. DeepSeek thinking models) reject a forced
+  // tool_choice. Restricting activeTools still makes the link-routing steps
+  // deterministic — only the intended tool exists — while the system prompt
+  // instructs the model to use it. Custom (openai-compatible) providers and
+  // unknown ids default to allowing the forced choice.
+  const forceToolChoice = isAIProviderId(selected.providerId)
+    ? getAIProviderAdapter(selected.providerId).supportsForcedToolChoice !==
+      false
+    : true;
   const prepareStep = ({ stepNumber }: { stepNumber: number }) => {
     if (stepNumber === 0 && linkPlan.reader) {
       return {
         activeTools: [linkPlan.reader] as Array<keyof typeof tools>,
-        toolChoice: { type: "tool" as const, toolName: linkPlan.reader },
+        ...(forceToolChoice
+          ? {
+              toolChoice: { type: "tool" as const, toolName: linkPlan.reader },
+            }
+          : {}),
       };
     }
     if (stepNumber === 1 && linkPlan.expandWithSearch) {
       return {
         activeTools: ["webSearch"] as Array<keyof typeof tools>,
-        toolChoice: { type: "tool" as const, toolName: "webSearch" as const },
+        ...(forceToolChoice
+          ? {
+              toolChoice: {
+                type: "tool" as const,
+                toolName: "webSearch" as const,
+              },
+            }
+          : {}),
       };
     }
     return {};

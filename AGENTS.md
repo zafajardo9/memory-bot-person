@@ -26,6 +26,9 @@ work progresses instead of improvising around it.
 | [`plans/toolkit-expansion-user-memory/PLAN.md`](plans/toolkit-expansion-user-memory/PLAN.md) | Planning | Toolkit expansion and persistent user memory. |
 | [`plans/chat-ui-gold-standard/PLAN.md`](plans/chat-ui-gold-standard/PLAN.md) | Implemented | Chat experience upgrade: linked citation chips, message actions (regenerate, edit & resend), streaming polish, composer drafts/keyboard, chat API hardening. |
 | [`plans/skill-precedence-retrieval-gate/PLAN.md`](plans/skill-precedence-retrieval-gate/PLAN.md) | Implemented | Active skills override agent style for the turn; a fail-open classifier skips notebook preflight (and its telemetry) for non-knowledge turns. |
+| [`plans/tinyfish-web-search-layer/PLAN.md`](plans/tinyfish-web-search-layer/PLAN.md) | Implemented | Adds TinyFish as a second web search provider behind a `WEB_SEARCH_PROVIDER` mode (tavily, tinyfish, or both); `both` merges and dedupes labeled results. |
+| [`plans/sidebar-nav-chat-history/PLAN.md`](plans/sidebar-nav-chat-history/PLAN.md) | Implemented | Replaces the hamburger/Sheet session browser with the `SidebarNav` primitive as a persistent collapsible chat-history rail (desktop), keeping the Sheet on mobile. Each row shows its agent identity chip and a hover delete action. |
+| [`plans/chat-tool-chips/PLAN.md`](plans/chat-tool-chips/PLAN.md) | Implemented | Adapts live chatbot reasoning and tool calls to the BeautifUI `ToolChips` primitive and foundation tokens while preserving rich outputs and AI SDK states. |
 
 When a new plan is created, add it to this table.
 

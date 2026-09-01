@@ -137,9 +137,10 @@ function SectionHeader({
 }
 
 export default async function ToolsPage() {
-  const [session, tavilyStatus] = await Promise.all([
+  const [session, tavilyStatus, tinyfishStatus] = await Promise.all([
     auth(),
     getIntegrationCredentialStatus("tavily"),
+    getIntegrationCredentialStatus("tinyfish"),
   ]);
   const canConfigureCredentials = session?.user?.role === "ADMIN";
   const visibleTavilyStatus = canConfigureCredentials
@@ -150,9 +151,20 @@ export default async function ToolsPage() {
         updatedBy: null,
         source: tavilyStatus.configured ? ("SITE" as const) : ("NONE" as const),
       };
+  const visibleTinyfishStatus = canConfigureCredentials
+    ? tinyfishStatus
+    : {
+        ...tinyfishStatus,
+        maskedKey: null,
+        updatedBy: null,
+        source: tinyfishStatus.configured
+          ? ("SITE" as const)
+          : ("NONE" as const),
+      };
   const knowledgeOn = isKnowledgeChatEnabled();
   const publicWebOn = isWebSearchEnabled();
-  const tavilySearchOn = publicWebOn && tavilyStatus.configured;
+  const webSearchOn =
+    publicWebOn && (tavilyStatus.configured || tinyfishStatus.configured);
   const agentBrowserOn =
     isAgentBrowserEnabled() && isAgentBrowserInstalled();
   const memoryOn = isUserMemoryEnabled();
@@ -238,11 +250,11 @@ export default async function ToolsPage() {
             "Find results only from arxiv.org",
           ],
           tools: ["webSearch"],
-          enabled: tavilySearchOn,
+          enabled: webSearchOn,
           note: !isWebSearchEnabled()
             ? "Web search is disabled by an administrator."
-            : !tavilyStatus.configured
-              ? "Add a Tavily API key below to enable live web search."
+            : !tavilyStatus.configured && !tinyfishStatus.configured
+              ? "Add a Tavily or TinyFish API key below to enable live web search."
               : undefined,
           icon: <Globe size={16} />,
           accent: blue,
@@ -406,14 +418,14 @@ export default async function ToolsPage() {
         {
           name: "webSearch",
           description:
-            "Searches the public web via Tavily API. Returns clean markdown results with source URLs. Supports recency filters (timeRange), domain allow/deny lists, and basic/advanced depth. Results are untrusted and supplementary to company knowledge.",
+            "Searches the public web via the configured providers (Tavily, TinyFish). Returns clean results with source URLs and a provider label per result. Supports recency filters (timeRange), domain allow/deny lists, and basic/advanced depth where the provider supports it. Results are untrusted and supplementary to company knowledge.",
           category: "Web",
           icon: <Globe size={14} />,
-          enabled: tavilySearchOn,
+          enabled: webSearchOn,
           note: !isWebSearchEnabled()
             ? "WEB_SEARCH_ENABLED is false"
-            : !tavilyStatus.configured
-              ? "Add a Tavily API key below"
+            : !tavilyStatus.configured && !tinyfishStatus.configured
+              ? "Add a Tavily or TinyFish API key below"
               : undefined,
         },
         {
@@ -592,9 +604,13 @@ export default async function ToolsPage() {
               ))}
             </div>
             {section.id === "web" ? (
-              <div className="mt-4">
+              <div className="mt-4 flex flex-col gap-4">
                 <IntegrationCredentialCard
                   initialStatus={visibleTavilyStatus}
+                  canConfigure={canConfigureCredentials}
+                />
+                <IntegrationCredentialCard
+                  initialStatus={visibleTinyfishStatus}
                   canConfigure={canConfigureCredentials}
                 />
               </div>

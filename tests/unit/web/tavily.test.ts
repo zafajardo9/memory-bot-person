@@ -32,6 +32,7 @@ describe("Tavily provider", () => {
         url: "https://example.com/article",
         content: "A useful snippet.",
         score: 0.91,
+        source: "Tavily",
         publishedDate: "2026-07-28",
       },
     ]);

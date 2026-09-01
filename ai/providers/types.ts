@@ -19,6 +19,12 @@ export interface AIProviderAdapter {
   defaultModelId: string;
   createLanguageModel: (apiKey: string, modelId: string) => LanguageModel;
   listModels: (apiKey: string) => Promise<AIProviderModel[]>;
+  /**
+   * Set false when the provider's API rejects a forced tool_choice (e.g.
+   * DeepSeek thinking models). Chat then relies on activeTools restriction
+   * plus prompt instructions instead of forcing the tool call.
+   */
+  supportsForcedToolChoice?: boolean;
 }
 
 export type AIProviderCredentialSource = "SITE" | "ENVIRONMENT" | "NONE";

@@ -70,6 +70,7 @@ export function createTavilyProvider(apiKey: string): WebSearchProvider {
         url: result.url,
         content: result.content,
         score: result.score,
+        source: "Tavily",
         ...(result.published_date
           ? { publishedDate: result.published_date }
           : {}),

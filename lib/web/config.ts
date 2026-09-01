@@ -3,6 +3,14 @@ function positiveInteger(name: string, fallback: number) {
   return Number.isSafeInteger(value) && value > 0 ? value : fallback;
 }
 
+export type WebSearchProviderMode = "tavily" | "tinyfish" | "both";
+
+/** Which web search provider(s) the current deployment should use. */
+export const webSearchProviderMode = (): WebSearchProviderMode => {
+  const value = process.env.WEB_SEARCH_PROVIDER?.trim().toLowerCase();
+  return value === "tinyfish" || value === "both" ? value : "tavily";
+};
+
 export const isWebSearchEnabled = () =>
   process.env.WEB_SEARCH_ENABLED?.toLowerCase() !== "false";
 export const isAgentBrowserEnabled = () => {

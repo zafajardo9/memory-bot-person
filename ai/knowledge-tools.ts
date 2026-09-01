@@ -18,66 +18,85 @@ export function createKnowledgeTools({
   chatId,
   agentId,
   model,
+  retrievalAvailable,
 }: {
   userId: string;
   chatId: string;
   agentId: string;
   model: LanguageModel;
+  /**
+   * False when the agent has no approved knowledge sources: retrieval tools
+   * (which embed the query and can fail noisily) are omitted entirely, while
+   * the note tool stays available for admins to grow the notebook.
+   */
+  retrievalAvailable: boolean;
 }) {
   return {
-    searchCompanyKnowledge: {
-      description:
-        "Search the approved company knowledge base. Always use this first for company work, policy, process, project, responsibility, or how-to questions. Optionally narrow results with tags or a source type (NOTE, FILE, URL).",
-      inputSchema: knowledgeSearchSchema,
-      execute: async (input: z.infer<typeof knowledgeSearchSchema>) => {
-        const { query, limit, tags, sourceType } = input;
-        const { results, queryLogId } = await searchCompanyKnowledge({
-          query,
-          limit,
-          tags,
-          sourceType,
-          userId,
-          chatId,
-          agentId,
-          rerankModel: model,
-        });
-        return {
-          query,
-          queryLogId,
-          found: results.length > 0,
-          results,
-          instruction:
-            results.length > 0
-              ? "Read the most relevant chunks with readCompanyKnowledge to widen context, then answer from the retrieved passages and cite every company claim."
-              : "Say that the answer was not found in approved company knowledge. General guidance must be clearly separated.",
-        };
-      },
-    },
-    readCompanyKnowledge: {
-      description:
-        "Read surrounding passages for relevant approved knowledge chunks returned by searchCompanyKnowledge. Use this to expand the context window around the most relevant hits before answering.",
-      inputSchema: z.object({
-        chunkIds: z.array(z.string().uuid()).min(1).max(20),
-      }),
-      execute: async ({ chunkIds }: { chunkIds: string[] }) => ({
-        sources: await readCompanyKnowledge(chunkIds, agentId),
-        instruction: "Answer from these passages and cite each company-specific claim.",
-      }),
-    },
-    listCompanyKnowledgeSources: {
-      description: "List the approved company knowledge sources currently available.",
-      inputSchema: z.object({}),
-      execute: async () => ({
-        sources: await prisma.knowledgeSource.findMany({
-          where: {
-            status: "APPROVED",
-            agents: { some: { agentId } },
+    ...(retrievalAvailable
+      ? {
+          searchCompanyKnowledge: {
+            description:
+              "Search the approved company knowledge base. Always use this first for company work, policy, process, project, responsibility, or how-to questions. Optionally narrow results with tags or a source type (NOTE, FILE, URL).",
+            inputSchema: knowledgeSearchSchema,
+            execute: async (input: z.infer<typeof knowledgeSearchSchema>) => {
+              const { query, limit, tags, sourceType } = input;
+              const { results, queryLogId } = await searchCompanyKnowledge({
+                query,
+                limit,
+                tags,
+                sourceType,
+                userId,
+                chatId,
+                agentId,
+                rerankModel: model,
+              });
+              return {
+                query,
+                queryLogId,
+                found: results.length > 0,
+                results,
+                instruction:
+                  results.length > 0
+                    ? "Read the most relevant chunks with readCompanyKnowledge to widen context, then answer from the retrieved passages and cite every company claim."
+                    : "Say that the answer was not found in approved company knowledge. General guidance must be clearly separated.",
+              };
+            },
           },
-          orderBy: { title: "asc" },
-          select: { id: true, title: true, type: true, tags: true, lastIndexedAt: true },
-        }),
-      }),
-    },
+          readCompanyKnowledge: {
+            description:
+              "Read surrounding passages for relevant approved knowledge chunks returned by searchCompanyKnowledge. Use this to expand the context window around the most relevant hits before answering.",
+            inputSchema: z.object({
+              chunkIds: z.array(z.string().uuid()).min(1).max(20),
+            }),
+            execute: async ({ chunkIds }: { chunkIds: string[] }) => ({
+              sources: await readCompanyKnowledge(chunkIds, agentId),
+              instruction:
+                "Answer from these passages and cite each company-specific claim.",
+            }),
+          },
+          listCompanyKnowledgeSources: {
+            description:
+              "List the approved company knowledge sources currently available.",
+            inputSchema: z.object({}),
+            execute: async () => ({
+              sources: await prisma.knowledgeSource.findMany({
+                where: {
+                  status: "APPROVED",
+                  agents: { some: { agentId } },
+                },
+                orderBy: { title: "asc" },
+                select: {
+                  id: true,
+                  title: true,
+                  type: true,
+                  tags: true,
+                  lastIndexedAt: true,
+                },
+              }),
+            }),
+          },
+        }
+      : {}),
     addKnowledgeNote: {
       description:
         "Save a note into the company Notebook as a draft for administrator review. Only call this when the user explicitly asks to add, save, or remember this content in the knowledge base — never silently. Only administrators may use it.",

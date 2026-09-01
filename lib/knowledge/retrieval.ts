@@ -29,6 +29,24 @@ interface SearchRow {
 
 const CANDIDATE_POOL = 40;
 
+/**
+ * Whether the agent has at least one approved, searchable knowledge source.
+ * Chat uses this to skip preflight retrieval and hide retrieval tools when
+ * there is nothing to search, avoiding needless embedding calls and tool calls.
+ */
+export async function agentHasApprovedKnowledge(agentId: string) {
+  const count = await prisma.agentKnowledgeSource.count({
+    where: {
+      agentId,
+      source: {
+        status: "APPROVED",
+        currentVersion: { status: "APPROVED" },
+      },
+    },
+  });
+  return count > 0;
+}
+
 function citationFor(result: Omit<SearchRow, "score">) {
   const location = result.pageNumber
     ? `page ${result.pageNumber}`
